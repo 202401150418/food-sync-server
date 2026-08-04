@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(command -v node)",
+      "Bash(node -e ' *)",
+      "Bash(command -v git gh)",
+      "Bash(git --version)",
+      "Bash(gh auth *)",
+      "Bash(git init *)",
+      "Bash(git config *)",
+      "Bash(git add *)",
+      "Bash(git commit -m '吃什么小站：单页应用 + Render 静态站配置 *)"
+    ]
+  }
+}
