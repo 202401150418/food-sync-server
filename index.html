@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>聊天室</title>
+</head>
+<body>
+<div id="msgList"></div>
+<input id="input" placeholder="输入消息">
+<button onclick="send()">发送</button>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+socket.on('chat',function(msg){
+  const div = document.createElement('div');
+  div.innerText = msg;
+  document.getElementById('msgList').appendChild(div);
+})
+function send(){
+  const val = document.getElementById('input').value;
+  socket.emit('chat',val);
+  document.getElementById('input').value='';
+}
+</script>
+</body>
+</html>
