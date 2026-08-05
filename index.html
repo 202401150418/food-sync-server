@@ -298,6 +298,13 @@
     font-size: 12px; color: #999; padding: 4px 10px; cursor: pointer; margin-left: 6px;
   }
   .room-item .ri-actions button:hover { color: #ff9a55; border-color: #ffcfad; }
+  .ri-kick {
+    border: none; background: none; color: #ddd; font-size: 11px;
+    cursor: pointer; padding: 0 2px; border-radius: 4px;
+  }
+  .ri-kick:hover { color: #e00; }
+  .rh-title { font-size: 12px; color: #bbb; margin: 12px 0 6px; }
+  .room-item-history { opacity: .75; }
   .modal-row { display: flex; gap: 8px; margin-top: 10px; }
   .modal-row input {
     flex: 1; border: 1px solid #eee; border-radius: 10px;
@@ -1639,6 +1646,7 @@
     <div class="um-title">🏠 我的房间</div>
     <p style="font-size:12px;color:#aaa;margin:-6px 0 12px">房间里的自定义菜全员共享；把邀请码发给饭搭子就能一起用</p>
     <div id="roomList"></div>
+    <div id="roomHistoryList"></div>
     <div class="modal-row">
       <input type="text" id="roomNameInput" maxlength="24" placeholder="新房间名，如：304 干饭群">
       <button class="btn btn-add2" onclick="createRoom()">创建</button>
@@ -4521,34 +4529,83 @@ function openRoomModal() {
 function hideRoomModal() {
   document.getElementById("roomModalMask").classList.remove("show");
 }
-function renderRoomList() {
+async function renderRoomList() {
   const box = document.getElementById("roomList");
   if (!Cloud.rooms.length) {
     box.innerHTML = '<p style="font-size:13px;color:#bbb;text-align:center;padding:12px 0">还没加入任何房间</p>';
-    return;
+  } else {
+    box.innerHTML = "";
+    Cloud.rooms.forEach(r => {
+      const isOwner = r.owner_id === Auth.user.id;
+      const div = document.createElement("div");
+      div.className = "room-item";
+      div.innerHTML = `
+        <div>
+          <div class="ri-name">${r.name}${isOwner ? " 👑" : ""}</div>
+          <div class="ri-code">邀请码：${r.invite_code}</div>
+          <div class="ri-members">${r.members.map(m =>
+            m.nickname + (m.id === r.owner_id ? "👑" : "") +
+            (isOwner && m.id !== Auth.user.id ? ` <button class="ri-kick" data-kick="${m.id}" data-name="${m.nickname}">移出</button>` : "")
+          ).join("、")}</div>
+        </div>
+        <div class="ri-actions">
+          <button data-act="copy">复制邀请码</button>
+          <button data-act="leave">退出</button>
+        </div>`;
+      div.querySelector('[data-act="copy"]').onclick = () => {
+        navigator.clipboard.writeText(r.invite_code)
+          .then(() => showToast("邀请码已复制 📋"))
+          .catch(() => prompt("邀请码（手动复制）：", r.invite_code));
+      };
+      div.querySelector('[data-act="leave"]').onclick = () => leaveRoom(r);
+      div.querySelectorAll("[data-kick]").forEach(btn => {
+        btn.onclick = () => kickMember(r, parseInt(btn.dataset.kick, 10), btn.dataset.name);
+      });
+      box.appendChild(div);
+    });
   }
-  box.innerHTML = "";
-  Cloud.rooms.forEach(r => {
-    const div = document.createElement("div");
-    div.className = "room-item";
-    div.innerHTML = `
-      <div>
-        <div class="ri-name">${r.name}${r.owner_id === Auth.user.id ? " 👑" : ""}</div>
-        <div class="ri-code">邀请码：${r.invite_code}</div>
-        <div class="ri-members">${r.members.map(m => m.nickname).join("、")}</div>
-      </div>
-      <div class="ri-actions">
-        <button data-act="copy">复制邀请码</button>
-        <button data-act="leave">退出</button>
-      </div>`;
-    div.querySelector('[data-act="copy"]').onclick = () => {
-      navigator.clipboard.writeText(r.invite_code)
-        .then(() => showToast("邀请码已复制 📋"))
-        .catch(() => prompt("邀请码（手动复制）：", r.invite_code));
-    };
-    div.querySelector('[data-act="leave"]').onclick = () => leaveRoom(r);
-    box.appendChild(div);
-  });
+  // 曾经加入的房间：可以随时回去
+  const histBox = document.getElementById("roomHistoryList");
+  if (!histBox) return;
+  try {
+    const { rooms: hist } = await api("/rooms/history");
+    const gone = hist.filter(h => !Cloud.rooms.some(r => r.id === h.id));
+    if (!gone.length) { histBox.innerHTML = ""; return; }
+    histBox.innerHTML = '<div class="rh-title">🕘 加入过的房间</div>';
+    gone.forEach(h => {
+      const div = document.createElement("div");
+      div.className = "room-item room-item-history";
+      div.innerHTML = `
+        <div>
+          <div class="ri-name">${h.name}</div>
+          <div class="ri-members">${h.member_count} 人在房间里</div>
+        </div>
+        <div class="ri-actions"><button data-act="rejoin">回去</button></div>`;
+      div.querySelector('[data-act="rejoin"]').onclick = () => rejoinRoom(h);
+      histBox.appendChild(div);
+    });
+  } catch { histBox.innerHTML = ""; }
+}
+async function rejoinRoom(h) {
+  try {
+    const { room } = await api(`/rooms/${h.id}/rejoin`, { method: "POST" });
+    Cloud.rooms.push(room);
+    const { dishes } = await api(`/dishes?scope=room&roomId=${room.id}`);
+    Cloud.roomDishes[room.id] = dishes;
+    renderRoomList();
+    renderMenuSourceBar();
+    showToast(`回到「${room.name}」啦 🎉`);
+  } catch (e) { showToast(e.message); }
+}
+async function kickMember(r, uid, nickname) {
+  if (!confirm(`确定把「${nickname}」移出「${r.name}」吗？\n对方凭历史记录仍可以自己回来。`)) return;
+  try {
+    await api(`/rooms/${r.id}/kick`, { method: "POST", body: { user_id: uid } });
+    const room = Cloud.rooms.find(x => x.id === r.id);
+    if (room) room.members = room.members.filter(m => m.id !== uid);
+    renderRoomList();
+    showToast(`已把「${nickname}」移出房间`);
+  } catch (e) { showToast(e.message); }
 }
 async function createRoom() {
   const name = document.getElementById("roomNameInput").value.trim();

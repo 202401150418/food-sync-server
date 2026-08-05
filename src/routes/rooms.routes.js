@@ -80,6 +80,37 @@ router.post("/join", wrap(async (req, res) => {
   res.json({ room: await roomWithMembers(rows[0].id) });
 }));
 
+// 回房间：凭历史成员记录直接回原房间，无需邀请码
+router.post("/:id/rejoin", wrap(async (req, res) => {
+  const roomId = reqInt(req.params.id, { min: 1, label: "房间 ID" });
+  const { rows } = await query(
+    `SELECT 1 FROM room_history WHERE room_id = $1 AND user_id = $2`,
+    [roomId, req.uid]
+  );
+  if (!rows.length) throw Object.assign(new Error("你没有加入过这个房间"), { status: 403 });
+  await query(
+    `INSERT INTO room_members (room_id, user_id) VALUES ($1, $2)
+     ON CONFLICT (room_id, user_id) DO NOTHING`,
+    [roomId, req.uid]
+  );
+  // 回房间后清掉历史记录（已是现成员）
+  await query(`DELETE FROM room_history WHERE room_id = $1 AND user_id = $2`, [roomId, req.uid]);
+  res.json({ room: await roomWithMembers(roomId) });
+}));
+
+// 我加入过的房间（含已退出的，标注 left_at）
+router.get("/history", wrap(async (req, res) => {
+  const { rows } = await query(
+    `SELECT r.id, r.name, h.left_at,
+            (SELECT COUNT(*) FROM room_members m WHERE m.room_id = r.id) AS member_count
+     FROM room_history h JOIN rooms r ON r.id = h.room_id
+     WHERE h.user_id = $1
+     ORDER BY h.left_at DESC`,
+    [req.uid]
+  );
+  res.json({ rooms: rows });
+}));
+
 router.get("/", wrap(async (req, res) => {
   const { rows } = await query(
     `SELECT room_id FROM room_members WHERE user_id = $1 ORDER BY joined_at`, [req.uid]
@@ -103,6 +134,12 @@ router.post("/:id/leave", wrap(async (req, res) => {
     await client.query(
       `DELETE FROM room_members WHERE room_id = $1 AND user_id = $2`, [roomId, req.uid]
     );
+    // 留痕：之后可以凭此记录随时回来
+    await client.query(
+      `INSERT INTO room_history (room_id, user_id) VALUES ($1, $2)
+       ON CONFLICT (room_id, user_id) DO UPDATE SET left_at = now()`,
+      [roomId, req.uid]
+    );
     const left = (await client.query(
       `SELECT user_id FROM room_members WHERE room_id = $1 ORDER BY joined_at`, [roomId]
     )).rows;
@@ -118,6 +155,29 @@ router.post("/:id/leave", wrap(async (req, res) => {
       );
     }
   });
+  res.json({ ok: true });
+}));
+
+// 房主移出成员
+router.post("/:id/kick", wrap(async (req, res) => {
+  const roomId = reqInt(req.params.id, { min: 1, label: "房间 ID" });
+  const targetUid = reqInt(req.body.user_id, { min: 1, label: "成员 ID" });
+  const { rows } = await query(`SELECT owner_id FROM rooms WHERE id = $1`, [roomId]);
+  if (!rows[0]) throw Object.assign(new Error("房间不存在"), { status: 404 });
+  if (rows[0].owner_id !== req.uid) throw Object.assign(new Error("只有房主能移出成员"), { status: 403 });
+  if (targetUid === req.uid) throw new Error("不能移出自己，要退出请用「退出」");
+
+  const member = await query(
+    `DELETE FROM room_members WHERE room_id = $1 AND user_id = $2 RETURNING user_id`,
+    [roomId, targetUid]
+  );
+  if (!member.rows.length) throw Object.assign(new Error("对方不在这个房间"), { status: 404 });
+  // 留痕：被移出的人凭历史记录可以自己回来
+  await query(
+    `INSERT INTO room_history (room_id, user_id) VALUES ($1, $2)
+     ON CONFLICT (room_id, user_id) DO UPDATE SET left_at = now()`,
+    [roomId, targetUid]
+  );
   res.json({ ok: true });
 }));
 

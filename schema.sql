@@ -49,6 +49,14 @@ CREATE TABLE IF NOT EXISTS room_members (
   PRIMARY KEY (room_id, user_id)
 );
 
+-- 房间历史成员：退出/被移出后留痕，凭记录可随时回原房间（无需邀请码）
+CREATE TABLE IF NOT EXISTS room_history (
+  room_id   INT NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+  user_id   INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  left_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (room_id, user_id)
+);
+
 -- 每餐一条记录，items 为 JSONB 快照（与前端记录形状一致）
 CREATE TABLE IF NOT EXISTS history (
   id         BIGSERIAL PRIMARY KEY,
