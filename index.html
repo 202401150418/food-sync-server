@@ -2918,7 +2918,9 @@ function saveCatFeed(s) { localStorage.setItem(CAT_FEED_KEY, JSON.stringify(s));
       <div class="cm-bar-label">饱腹 ${feed.kcal} / ${CAT_STOMACH_KCAL} kcal</div>
     `;
     if (view === "feed") {
-      const recs = loadHistoryFor(currentUser).filter(r => r.date === todayStr());
+      // 登录后今日记录来自云端缓存，游客读本机
+      const todayRecs = (Auth.loggedIn && Cloud.history) ? Cloud.history : loadHistoryFor(currentUser);
+      const recs = todayRecs.filter(r => r.date === todayStr());
       const items = [];
       recs.forEach(r => r.items.forEach(i => items.push(i)));
       let body;
@@ -2972,7 +2974,8 @@ function saveCatFeed(s) { localStorage.setItem(CAT_FEED_KEY, JSON.stringify(s));
   function feedCat(name) {
     const feed = loadCatFeed();
     const left = CAT_STOMACH_KCAL - feed.kcal;
-    const recs = loadHistoryFor(currentUser).filter(r => r.date === todayStr());
+    const todayRecs = (Auth.loggedIn && Cloud.history) ? Cloud.history : loadHistoryFor(currentUser);
+    const recs = todayRecs.filter(r => r.date === todayStr());
     const item = recs.flatMap(r => r.items).find(i => i.name === name);
     if (!item) return;
     if (item.cat === "甜品饮品") { showToast("哈基米吃了会鼠！🙀"); return; }
@@ -3092,7 +3095,7 @@ function chefSay(text, holdMs = 3000) {
   chefTimer = setTimeout(() => bubble.classList.remove("show"), holdMs);
 }
 function renderTable() {
-  // 云端模式：登录且有房间时，先从服务器拉房间成员今日干饭数据再渲染
+  // 云端模式：登录且有房间时，从服务器拉房间成员今日干饭数据
   if (Auth.loggedIn && Cloud.rooms.length) {
     const roomId = (Cloud.menuSource !== "mine" && Cloud.roomDishes[Cloud.menuSource])
       ? Cloud.menuSource : Cloud.rooms[0].id;
@@ -3107,6 +3110,15 @@ function renderTable() {
         renderTableBody(local);
       })
       .catch(e => { showToast("饭桌数据加载失败：" + e.message); renderTableBody(null); });
+    return;
+  }
+  // 登录但没房间：小饭桌只显示自己（数据在云端缓存里）
+  if (Auth.loggedIn && Cloud.history && Auth.user) {
+    const uid = "cloud:" + Auth.user.id;
+    Cloud.memberProfiles = { [uid]: Auth.user };
+    const today = todayStr();
+    const recs = Cloud.history.filter(r => r.date === today);
+    renderTableBody(recs.length ? [{ uid, recs, total: recs.reduce((s, r) => s + r.total, 0) }] : []);
     return;
   }
   // 游客模式：本机各用户的今日记录（原逻辑）
