@@ -1462,10 +1462,15 @@
       width: 100%; max-height: 72vh; border-radius: 18px 18px 0 0;
       border: none; border-top: 1px solid #f0f0f0;
       box-shadow: 0 -8px 30px rgba(0,0,0,.14);
-      transform: translateY(100%); transition: transform .28s ease;
+      transform: translateY(102%); transition: transform .28s ease;
       padding: 4px 16px 20px;
+      visibility: hidden;   /* 收起时完全不可见，避免露边 */
     }
-    .plate.drawer-open { transform: translateY(0); }
+    .plate.drawer-open { transform: translateY(0); visibility: visible; }
+    /* 非选餐页：餐盘/悬浮条一律不显示（fixed 元素不受 .view 隐藏影响） */
+    .view:not(.active) .plate,
+    .view:not(.active) .plate-fab,
+    .view:not(.active) .plate-mask { display: none; }
     .plate-grab {
       display: flex; justify-content: center; padding: 8px 0 4px; cursor: pointer;
     }
