@@ -1533,6 +1533,14 @@
     border-radius: 12px; padding: 9px 14px; margin: 0 0 10px;
     font-size: 12.5px;
   }
+  /* 小饭桌房间切换条 */
+  .table-room-bar { display: none; gap: 6px; flex-wrap: wrap; margin: 10px 0 2px; }
+  .table-room-bar.show { display: flex; }
+  .tr-btn {
+    border: 1px solid #d9e8de; background: #fff; color: #43825c;
+    border-radius: 16px; padding: 5px 14px; font-size: 12.5px; cursor: pointer;
+  }
+  .tr-btn.active { background: #7cb890; color: #fff; border-color: #7cb890; }
   @media (max-width: 800px) and (orientation: portrait) {
     .rotate-tip { display: flex; }
 
@@ -1849,6 +1857,7 @@
         <h2>🍽️ 今日小饭桌</h2>
         <span class="today-stat" id="tableStat"></span>
       </div>
+      <div class="table-room-bar" id="tableRoomBar"></div>
       <div class="rotate-tip">📱 小饭桌横屏体验更佳，旋转手机试试吧 ↻</div>
       <div class="table-scene" id="tableScene">
         <!-- 餐厅背景：木墙 + 暖帘 + 吊灯 + 菜单牌 -->
@@ -3102,11 +3111,32 @@ function chefSay(text, holdMs = 3000) {
   stopChefTalk();
   chefTimer = setTimeout(() => bubble.classList.remove("show"), holdMs);
 }
+// 小饭桌当前查看的房间（登录多房间时可切换）
+let tableRoomId = null;
+function renderTableRoomBar() {
+  const bar = document.getElementById("tableRoomBar");
+  if (!bar) return;
+  if (!(Auth.loggedIn && Cloud.rooms.length)) { bar.classList.remove("show"); bar.innerHTML = ""; return; }
+  // 默认选中：菜单来源房间，否则第一个房间
+  if (!tableRoomId || !Cloud.rooms.some(r => r.id === tableRoomId)) {
+    tableRoomId = (Cloud.menuSource !== "mine" && Cloud.rooms.some(r => String(r.id) === String(Cloud.menuSource)))
+      ? Number(Cloud.menuSource) : Cloud.rooms[0].id;
+  }
+  bar.classList.add("show");
+  bar.innerHTML = "";
+  Cloud.rooms.forEach(r => {
+    const b = document.createElement("button");
+    b.className = "tr-btn" + (r.id === tableRoomId ? " active" : "");
+    b.textContent = "🏠 " + r.name;
+    b.onclick = () => { tableRoomId = r.id; renderTableRoomBar(); renderTable(); };
+    bar.appendChild(b);
+  });
+}
 function renderTable() {
+  renderTableRoomBar();
   // 云端模式：登录且有房间时，从服务器拉房间成员今日干饭数据
   if (Auth.loggedIn && Cloud.rooms.length) {
-    const roomId = (Cloud.menuSource !== "mine" && Cloud.roomDishes[Cloud.menuSource])
-      ? Cloud.menuSource : Cloud.rooms[0].id;
+    const roomId = tableRoomId || Cloud.rooms[0].id;
     api(`/rooms/${roomId}/table?date=${todayStr()}`)
       .then(({ diners }) => {
         Cloud.memberProfiles = {};
