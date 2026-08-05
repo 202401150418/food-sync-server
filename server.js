@@ -17,13 +17,15 @@ app.use("/api/dishes", require("./src/routes/dishes.routes"));
 app.use("/api/rooms", require("./src/routes/rooms.routes"));
 app.use("/api/history", require("./src/routes/history.routes"));
 app.use("/api/blacklist", require("./src/routes/blacklist.routes"));
-app.use("/api", require("./src/routes/state.routes")); // /api/state, /api/migrate
 
-// 系统菜品目录：静态 JSON，长缓存
+// 系统菜品目录：公开静态 JSON，长缓存（必须在 state.routes 之前，
+// 否则 /api/system-dishes 会被 state 路由的 authRequired 拦截要求登录）
 app.get("/api/system-dishes", (req, res) => {
   res.setHeader("Cache-Control", "public, max-age=86400");
   res.sendFile(path.join(__dirname, "seed-dishes.json"));
 });
+
+app.use("/api", require("./src/routes/state.routes")); // /api/state, /api/migrate
 
 // /api 下的 404 返回 JSON 而不是 HTML
 app.use("/api", (req, res) => res.status(404).json({ error: "接口不存在" }));
