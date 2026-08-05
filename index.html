@@ -1427,16 +1427,16 @@
     .home-stat { padding: 12px 14px; }
 
     /* 选餐页：左店铺窄栏 + 右菜品区两栏并排；餐盘变底部抽屉 */
-    .container { display: block; padding: 8px; }
-    .toolbar { top: 53px; }
-    /* 两栏：店铺栏固定窄列，菜品区占满剩余 */
-    .shop-layout {
-      display: grid; grid-template-columns: 96px 1fr; gap: 8px;
-      align-items: start;
+    /* container 的直接子元素：shop-rail(左) + main(右) + plate(抽屉，脱离流) */
+    .container {
+      display: grid; grid-template-columns: 92px 1fr; gap: 8px;
+      padding: 8px; align-items: start;
     }
+    .toolbar { top: 53px; }
+    .main { min-width: 0; }
     .shop-rail {
-      width: auto; position: sticky; top: 110px; order: -1;
-      flex-direction: column; overflow-y: auto; overflow-x: hidden;
+      width: auto; position: sticky; top: 110px;
+      display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden;
       max-height: calc(100vh - 130px); gap: 0; padding-bottom: 0;
       background: #fff; border: 1px solid #f0f0f0; border-radius: 12px;
     }
@@ -1462,9 +1462,10 @@
       width: 100%; max-height: 72vh; border-radius: 18px 18px 0 0;
       border: none; border-top: 1px solid #f0f0f0;
       box-shadow: 0 -8px 30px rgba(0,0,0,.14);
-      transform: translateY(102%); transition: transform .28s ease;
-      padding: 4px 16px 20px;
+      transition: transform .28s ease, visibility .28s;
+      transform: translateY(105%);
       visibility: hidden;   /* 收起时完全不可见，避免露边 */
+      padding: 4px 16px 20px;
     }
     .plate.drawer-open { transform: translateY(0); visibility: visible; }
     /* 非选餐页：餐盘/悬浮条一律不显示（fixed 元素不受 .view 隐藏影响） */
