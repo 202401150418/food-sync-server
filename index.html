@@ -1471,6 +1471,47 @@
   }
   @media (max-width: 800px) and (orientation: portrait) {
     .rotate-tip { display: flex; }
+
+    /* ===== 竖屏专属排版优化 ===== */
+    /* 首页：问候区收紧，卡片横排（图标左、文字右），一列铺满，少占纵向空间 */
+    .home-hello { margin-bottom: 16px; }
+    .home-hello h2 { font-size: 20px; }
+    .home-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .home-card {
+      flex-direction: row; align-items: center; gap: 10px;
+      min-height: 0; padding: 14px 12px; border-radius: 14px;
+    }
+    .home-card .hc-emoji { font-size: 26px; }
+    .home-card .hc-title { font-size: 13.5px; }
+    .home-card .hc-desc { display: none; }   /* 竖屏省略描述，卡片更轻 */
+    .home-stat { flex-direction: column; align-items: flex-start; gap: 4px; padding: 12px 14px; }
+
+    /* 选餐：工具栏吸顶位置随紧凑顶栏调整；搜索框整行 */
+    .toolbar { gap: 6px; }
+    .toolbar input[type="text"] { min-width: 0; flex: 1 1 100%; }
+    .categories { gap: 6px; }
+    .cat-btn { padding: 6px 12px; font-size: 12px; }
+
+    /* 历史/垃圾桶条目：时间换行更紧凑 */
+    .panel { padding: 14px 14px; border-radius: 12px; }
+    .h-item { gap: 6px; padding: 9px 0; font-size: 12.5px; }
+    .h-foods { min-width: 90px; }
+
+    /* 抽卡页：模式卡片横排紧凑 */
+    .gacha-modes { grid-template-columns: 1fr; gap: 8px; margin-top: 12px; }
+    .gacha-mode-card {
+      flex-direction: row; align-items: center; gap: 10px;
+      min-height: 0; padding: 14px 16px;
+    }
+
+    /* Omakase 舞台再压一点高度 */
+    .oma-scene { height: 210px; }
+
+    /* 小饭桌：面板边距收窄，食客列表字号缩小 */
+    .diner-item { font-size: 12px; }
+
+    /* BMI 结果数字别溢出 */
+    .bmi-num { font-size: 40px; }
   }
 </style>
 </head>
