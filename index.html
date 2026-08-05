@@ -229,6 +229,82 @@
   }
   .card .btn-add:hover { background: #ffab73; color: #fff; border-color: #ffab73; }
 
+  /* ============ 云端同步 UI ============ */
+  .sync-badge {
+    position: fixed; top: 64px; right: 12px; z-index: 999;
+    background: #fff; border: 1px solid #ffd9b8; color: #ff9a55;
+    border-radius: 20px; padding: 6px 14px; font-size: 12px;
+    box-shadow: 0 4px 12px rgba(255,154,85,.15);
+  }
+  /* 顶栏账号 chip */
+  .account-chip {
+    display: none; align-items: center; gap: 6px; cursor: pointer;
+    background: #fff; border: 1px solid #f0f0f0; border-radius: 20px;
+    padding: 4px 12px 4px 4px; font-size: 13px; color: #555;
+  }
+  .account-chip:hover { border-color: #ffcfad; color: #ff9a55; }
+  .account-chip .ac-avatar {
+    width: 24px; height: 24px; border-radius: 50%;
+    background-size: cover; background-position: center;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 12px; font-weight: bold;
+  }
+  .account-menu {
+    position: absolute; top: 46px; right: 0; z-index: 99; min-width: 150px;
+    background: #fff; border: 1px solid #f0f0f0; border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.1); overflow: hidden; display: none;
+  }
+  .account-menu.show { display: block; }
+  .account-menu button {
+    display: block; width: 100%; border: none; background: none;
+    padding: 11px 16px; font-size: 13px; color: #555; text-align: left; cursor: pointer;
+  }
+  .account-menu button:hover { background: #fff5ee; color: #ff9a55; }
+  .user-box { position: relative; }
+  /* 登录弹窗 */
+  .auth-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+  .auth-tab {
+    flex: 1; border: none; background: #f6f6f6; color: #888;
+    border-radius: 10px; padding: 9px 0; font-size: 14px; cursor: pointer;
+  }
+  .auth-tab.active { background: #ffab73; color: #fff; }
+  /* 菜单来源切换条 */
+  .menu-source-bar {
+    display: none; gap: 6px; flex-wrap: wrap; margin-bottom: 12px;
+  }
+  .menu-source-bar.show { display: flex; }
+  .ms-btn {
+    border: 1px solid #ffd9b8; background: #fff; color: #ff9a55;
+    border-radius: 16px; padding: 5px 14px; font-size: 12.5px; cursor: pointer;
+  }
+  .ms-btn.active { background: #ffab73; color: #fff; border-color: #ffab73; }
+  /* 菜品卡片管理按钮 */
+  .card .btn-edit-dish {
+    position: absolute; top: 3px; left: 3px;
+    border: none; background: none; color: #ddd; cursor: pointer; font-size: 11px;
+    padding: 2px 3px; border-radius: 8px;
+  }
+  .card .btn-edit-dish:hover { color: #ff9a55; background: #fff5ee; }
+  /* 房间列表 */
+  .room-item {
+    display: flex; align-items: center; justify-content: space-between;
+    background: #fafafa; border-radius: 10px; padding: 10px 12px; margin-bottom: 8px;
+  }
+  .room-item .ri-name { font-size: 14px; font-weight: bold; color: #444; }
+  .room-item .ri-code { font-size: 12px; color: #ff9a55; letter-spacing: 1px; }
+  .room-item .ri-members { font-size: 11px; color: #aaa; margin-top: 2px; }
+  .room-item .ri-actions button {
+    border: 1px solid #eee; background: #fff; border-radius: 8px;
+    font-size: 12px; color: #999; padding: 4px 10px; cursor: pointer; margin-left: 6px;
+  }
+  .room-item .ri-actions button:hover { color: #ff9a55; border-color: #ffcfad; }
+  .modal-row { display: flex; gap: 8px; margin-top: 10px; }
+  .modal-row input {
+    flex: 1; border: 1px solid #eee; border-radius: 10px;
+    padding: 9px 12px; font-size: 13px; outline: none;
+  }
+  .modal-row input:focus { border-color: #ffcfad; }
+
   /* 自定义食物面板 */
   .custom-panel {
     background: #fff; border: 1px solid #f0f0f0; border-radius: 12px;
@@ -1349,8 +1425,64 @@
     <div class="u-avatar" id="uAvatar" title="编辑资料" onclick="openUserEdit()">U</div>
     <select id="userSelect" onchange="onUserChange(this.value)"></select>
     <button class="u-edit" title="编辑资料" onclick="openUserEdit()">✏️</button>
+    <div class="account-chip" id="accountChip" onclick="toggleAccountMenu(event)">
+      <div class="ac-avatar" id="acAvatar">☁️</div>
+      <span id="acName">未登录</span>
+    </div>
+    <div class="account-menu" id="accountMenu">
+      <button onclick="openRoomModal()">🏠 我的房间</button>
+      <button onclick="logoutCloud()">🚪 退出登录</button>
+    </div>
   </div>
 </header>
+
+<!-- 登录 / 注册弹窗 -->
+<div class="modal-mask" id="authModalMask" onclick="if(event.target===this)hideAuthModal()">
+  <div class="modal user-modal">
+    <div class="um-title">☁️ 云端账号</div>
+    <p style="font-size:12px;color:#aaa;margin:-6px 0 12px">登录后菜单、记录、黑名单多设备同步，还能和饭搭子共享菜单</p>
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tabLogin" onclick="switchAuthTab('login')">登录</button>
+      <button class="auth-tab" id="tabRegister" onclick="switchAuthTab('register')">注册</button>
+    </div>
+    <div class="um-field">
+      <label>用户名</label>
+      <input type="text" id="authUser" maxlength="32" placeholder="2~32 位" autocomplete="username">
+    </div>
+    <div class="um-field">
+      <label>密码</label>
+      <input type="password" id="authPass" maxlength="72" placeholder="至少 6 位" autocomplete="current-password">
+    </div>
+    <div class="um-field" id="authNickRow" style="display:none">
+      <label>昵称（可选）</label>
+      <input type="text" id="authNick" maxlength="24" placeholder="不填就用用户名">
+    </div>
+    <div class="um-actions">
+      <button class="btn btn-add2" id="authSubmit" onclick="submitAuth()">登录</button>
+      <button class="btn btn-close" onclick="hideAuthModal()">先逛逛</button>
+    </div>
+  </div>
+</div>
+
+<!-- 房间弹窗 -->
+<div class="modal-mask" id="roomModalMask" onclick="if(event.target===this)hideRoomModal()">
+  <div class="modal user-modal" style="max-width:420px">
+    <div class="um-title">🏠 我的房间</div>
+    <p style="font-size:12px;color:#aaa;margin:-6px 0 12px">房间里的自定义菜全员共享；把邀请码发给饭搭子就能一起用</p>
+    <div id="roomList"></div>
+    <div class="modal-row">
+      <input type="text" id="roomNameInput" maxlength="24" placeholder="新房间名，如：304 干饭群">
+      <button class="btn btn-add2" onclick="createRoom()">创建</button>
+    </div>
+    <div class="modal-row">
+      <input type="text" id="roomCodeInput" maxlength="6" placeholder="输入 6 位邀请码" style="text-transform:uppercase">
+      <button class="btn btn-again" onclick="joinRoom()">加入</button>
+    </div>
+    <div class="um-actions">
+      <button class="btn btn-close" onclick="hideRoomModal()">关闭</button>
+    </div>
+  </div>
+</div>
 
 <!-- 用户资料编辑弹窗 -->
 <div class="modal-mask" id="userModalMask" onclick="if(event.target===this)hideUserEdit()">
@@ -1436,6 +1568,8 @@
       <!-- 菜品区 -->
       <div class="shop-layout">
         <div class="shop-menu">
+          <!-- 菜单来源切换（登录后显示） -->
+          <div class="menu-source-bar" id="menuSourceBar"></div>
           <!-- 自定义食物 -->
           <div class="custom-panel">
             <div class="custom-title" onclick="toggleCustom()">
@@ -1450,6 +1584,7 @@
                 <span id="customSuggest"></span>
                 <input type="number" id="customKcal" min="0" max="3000" placeholder="kcal">
                 <button class="btn btn-add2" onclick="addCustom()">＋ 加入餐盘</button>
+                <button class="btn btn-lucky" id="saveToMenuBtn" style="display:none" onclick="saveCustomToMenu()">☁️ 存入菜单</button>
               </div>
               <div class="custom-tip" id="customTip">内置常见菜品热量数据库，自动匹配估算；查不到可手动填写热量。</div>
             </div>
@@ -2030,7 +2165,8 @@ const _origGoView = null;
 window.addEventListener("load", () => applyTwemoji());
 
 // ============ 食物数据库 ============
-const FOODS = [
+// 注意：登录后 FOODS 会被云端菜单整体替换（见末尾云端同步层）
+let FOODS = [
   // 中餐家常菜
   { name: "宫保鸡丁", emoji: "🍗", kcal: 280, cat: "中餐" },
   { name: "鱼香肉丝", emoji: "🥩", kcal: 260, cat: "中餐" },
@@ -2170,7 +2306,7 @@ const FOODS = [
   { name: "麦炫酷", emoji: "🍨", kcal: 250, cat: "甜品饮品" },
 ];
 
-const CATS = ["全部", ...new Set(FOODS.map(f => f.cat))];
+let CATS = ["全部", ...new Set(FOODS.map(f => f.cat))];
 const MEAL_TARGET = { lunch: 700, dinner: 600 };
 const HISTORY_KEY = "mealHistory";
 const BLACKLIST_KEY = "mealBlacklist";
@@ -2204,6 +2340,11 @@ function hashStr(s) {
   return h;
 }
 function getProfile(uid) {
+  // 云端模式：房间成员的资料存在云端注册表（key 形如 "cloud:<id>"）
+  if (typeof uid === "string" && uid.startsWith("cloud:")) {
+    const m = (typeof Cloud !== "undefined" ? Cloud.memberProfiles[uid] : null);
+    if (m) return { color: m.color || MUTED_COLORS[hashStr(uid) % MUTED_COLORS.length], avatar: m.avatar, _name: m.nickname };
+  }
   try {
     const p = JSON.parse(localStorage.getItem(`${PROFILE_KEY}__${uid}`));
     if (p && p.color) return p;
@@ -2214,7 +2355,13 @@ function getProfile(uid) {
 function saveProfile(uid, p) {
   localStorage.setItem(`${PROFILE_KEY}__${uid}`, JSON.stringify(p));
 }
-function userDisplayName(uid) { return uid === "default" ? "默认用户" : uid; }
+function userDisplayName(uid) {
+  if (typeof uid === "string" && uid.startsWith("cloud:")) {
+    const m = (typeof Cloud !== "undefined" && Cloud.memberProfiles[uid]);
+    if (m) return m.nickname;
+  }
+  return uid === "default" ? "默认用户" : uid;
+}
 
 // 把头像/名字渲染到元素上（圆形头像）
 function paintAvatar(el, uid, initialSize) {
@@ -2414,8 +2561,14 @@ const EXTRA_KCAL = {
   "吉士蛋麦满分": 330, "热香饼": 350, "玉米杯": 70, "开心乐园餐": 500,
 };
 const KCAL_DB = {};
-Object.assign(KCAL_DB, EXTRA_KCAL);
-FOODS.forEach(f => { KCAL_DB[f.name] = f.kcal; });
+// 菜单（FOODS）变化后重算派生数据：分类列表 + 热量查询表
+function recomputeDerived() {
+  CATS = ["全部", ...new Set(FOODS.map(f => f.cat))];
+  for (const k of Object.keys(KCAL_DB)) delete KCAL_DB[k];
+  Object.assign(KCAL_DB, EXTRA_KCAL);
+  FOODS.forEach(f => { KCAL_DB[f.name] = f.kcal; });
+}
+recomputeDerived();
 
 // ============ 页面切换 ============
 const VIEW_TITLES = { home: "🍚 今天吃什么", food: "🍽️ 选餐", history: "📖 进食记录", bin: "🗑️ 厨余垃圾", table: "🍽️ 小饭桌", gacha: "🎲 随机来一道", bmi: "⚖️ BMI 计算器" };
@@ -2690,13 +2843,15 @@ function renderMenuBoard() {
   if (!board) return;
   const today = todayStr();
   const counts = {};
-  loadUsers().forEach(uid => {
-    loadHistoryFor(uid)
-      .filter(r => r.date === today)
-      .forEach(r => r.items.forEach(i => {
-        if (!counts[i.name]) counts[i.name] = { emoji: i.emoji, qty: 0 };
-        counts[i.name].qty += i.qty || 1;
-      }));
+  // 游客：统计本机所有用户；登录：统计自己的今日记录
+  const sources = (Auth.loggedIn)
+    ? [loadHistory()]
+    : loadUsers().map(uid => loadHistoryFor(uid));
+  sources.forEach(recs => {
+    recs.filter(r => r.date === today).forEach(r => r.items.forEach(i => {
+      if (!counts[i.name]) counts[i.name] = { emoji: i.emoji, qty: 0 };
+      counts[i.name].qty += i.qty || 1;
+    }));
   });
   const entries = Object.entries(counts);
   let lines;
@@ -2736,13 +2891,24 @@ function chefSay(text, holdMs = 3000) {
   chefTimer = setTimeout(() => bubble.classList.remove("show"), holdMs);
 }
 function renderTable() {
-  stopBelt();
-  seatPick = null;
-  pilePopEl = null;
-  const scene = document.getElementById("tableScene");
-  scene.querySelectorAll(".seat").forEach(el => el.remove());
-  renderMenuBoard();
-
+  // 云端模式：登录且有房间时，先从服务器拉房间成员今日干饭数据再渲染
+  if (Auth.loggedIn && Cloud.rooms.length) {
+    const roomId = (Cloud.menuSource !== "mine" && Cloud.roomDishes[Cloud.menuSource])
+      ? Cloud.menuSource : Cloud.rooms[0].id;
+    api(`/rooms/${roomId}/table?date=${todayStr()}`)
+      .then(({ diners }) => {
+        Cloud.memberProfiles = {};
+        const local = diners.map(d => {
+          const uid = "cloud:" + d.user.id;
+          Cloud.memberProfiles[uid] = d.user;
+          return d.recs.length ? { uid, recs: d.recs, total: d.total } : null;
+        }).filter(Boolean);
+        renderTableBody(local);
+      })
+      .catch(e => { showToast("饭桌数据加载失败：" + e.message); renderTableBody(null); });
+    return;
+  }
+  // 游客模式：本机各用户的今日记录（原逻辑）
   const today = todayStr();
   const diners = loadUsers()
     .map(uid => {
@@ -2750,6 +2916,16 @@ function renderTable() {
       return recs.length ? { uid, recs, total: recs.reduce((s, r) => s + r.total, 0) } : null;
     })
     .filter(Boolean);
+  renderTableBody(diners);
+}
+function renderTableBody(diners) {
+  diners = diners || [];
+  stopBelt();
+  seatPick = null;
+  pilePopEl = null;
+  const scene = document.getElementById("tableScene");
+  scene.querySelectorAll(".seat").forEach(el => el.remove());
+  renderMenuBoard();
 
   const empty = document.getElementById("tableEmpty");
   const hint = document.getElementById("seatHint");
@@ -3073,19 +3249,23 @@ const SHOP_ICONS = {
   "甜品饮品": "🧋 甜甜奶茶屋"
 };
 const shopList = document.getElementById("shopList");
-CATS.forEach(c => {
-  const cnt = c === "全部" ? FOODS.length : FOODS.filter(f => f.cat === c).length;
-  const btn = document.createElement("button");
-  btn.className = "shop-item" + (c === "全部" ? " active" : "");
-  btn.dataset.cat = c;
-  btn.innerHTML = `<span>${SHOP_ICONS[c] || "🍽️ " + c}</span><span class="cnt">${cnt}道</span>`;
-  btn.onclick = () => {
-    currentCat = c;
-    document.querySelectorAll(".shop-item").forEach(b => b.classList.toggle("active", b.dataset.cat === c));
-    renderGrid();
-  };
-  shopList.appendChild(btn);
-});
+function rebuildShopList() {
+  shopList.innerHTML = "";
+  CATS.forEach(c => {
+    const cnt = c === "全部" ? FOODS.length : FOODS.filter(f => f.cat === c).length;
+    const btn = document.createElement("button");
+    btn.className = "shop-item" + (c === currentCat ? " active" : "");
+    btn.dataset.cat = c;
+    btn.innerHTML = `<span>${SHOP_ICONS[c] || "🍽️ " + c}</span><span class="cnt">${cnt}道</span>`;
+    btn.onclick = () => {
+      currentCat = c;
+      document.querySelectorAll(".shop-item").forEach(b => b.classList.toggle("active", b.dataset.cat === c));
+      renderGrid();
+    };
+    shopList.appendChild(btn);
+  });
+}
+rebuildShopList();
 
 // ============ 猜你喜欢 / 常吃 ============
 // 从历史记录统计每种食物的点单次数
@@ -3155,6 +3335,7 @@ function renderGrid() {
     const card = document.createElement("div");
     card.className = "card";
     card.innerHTML = `
+      ${f.custom ? '<button class="btn-edit-dish" title="编辑/删除">✏️</button>' : ""}
       <button class="btn-ban" title="拒吃这道菜">🚫</button>
       <div class="emoji">${f.emoji}</div>
       <div class="name">${f.name}</div>
@@ -3164,6 +3345,7 @@ function renderGrid() {
     `;
     card.querySelector(".btn-add").onclick = () => addToPlate(f);
     card.querySelector(".btn-ban").onclick = () => banFood(f.name);
+    if (f.custom) card.querySelector(".btn-edit-dish").onclick = () => editCustomDish(f);
     grid.appendChild(card);
   });
 }
@@ -3308,7 +3490,7 @@ function todayStr() {
 function todayTotalKcal() {
   return loadHistory().filter(r => r.date === todayStr()).reduce((s, r) => s + r.total, 0);
 }
-function recordMeal() {
+async function recordMeal() {
   const items = plate[currentMeal];
   if (!items.length) { showToast("餐盘是空的，先加点吃的再记录～"); return; }
   const now = new Date();
@@ -3321,21 +3503,44 @@ function recordMeal() {
     items: items.map(i => ({ name: i.name, emoji: i.emoji, kcal: i.kcal, qty: i.qty })),
     total: plateTotal(items)
   };
-  const list = loadHistory();
-  list.unshift(rec);
-  saveHistory(list);
+  if (Auth.loggedIn) {
+    // 云端模式：先写服务器，成功才更新本地缓存（服务器为准）
+    try {
+      const { record } = await api("/history", { method: "POST", body: { ...rec, client_id: rec.id } });
+      Cloud.history.unshift(record);
+    } catch (e) {
+      showToast("记录失败：" + e.message);
+      return;
+    }
+  } else {
+    const list = loadHistory();
+    list.unshift(rec);
+    saveHistory(list);
+  }
   plate[currentMeal] = [];
   savePlate();
   renderPlate();
   showToast("已记录这一餐 ✅");
 }
 function deleteRecord(id) {
+  if (Auth.loggedIn) {
+    api("/history/" + id, { method: "DELETE" })
+      .then(() => { Cloud.history = Cloud.history.filter(r => r.id !== id); renderHistory(); })
+      .catch(e => showToast("删除失败：" + e.message));
+    return;
+  }
   saveHistory(loadHistory().filter(r => r.id !== id));
   renderHistory();
 }
 function clearHistory() {
   if (!loadHistory().length) return;
   if (confirm("确定要清空全部进食记录吗？")) {
+    if (Auth.loggedIn) {
+      api("/history", { method: "DELETE" })
+        .then(() => { Cloud.history = []; renderHistory(); })
+        .catch(e => showToast("清空失败：" + e.message));
+      return;
+    }
     saveHistory([]);
     renderHistory();
   }
@@ -3749,7 +3954,409 @@ document.getElementById("omaChef").addEventListener("click", () => {
   startOmakase();   // 点厨师：开做 / 重做一套
 });
 
-// 初始化
+// ============ 云端同步层 ============
+// 游客模式（未登录）行为与原来完全一致；登录后服务器为准。
+const Auth = {
+  get token() { return localStorage.getItem("mealToken"); },
+  get loggedIn() { return !!this.token; },
+  user: null,
+  setSession(token, user) { localStorage.setItem("mealToken", token); this.user = user; },
+  clear() { localStorage.removeItem("mealToken"); this.user = null; }
+};
+
+// 云端缓存：登录后 load* 系列函数改从这里读
+const Cloud = {
+  system: null,        // 系统菜品目录
+  personal: [],        // 我的自定义菜
+  rooms: [],           // 我加入的房间（含成员）
+  roomDishes: {},      // roomId -> 房间自定义菜
+  history: null,
+  blacklist: null,
+  menuSource: "mine",  // "mine" 或房间 id
+  memberProfiles: {},  // "cloud:<id>" -> 房间成员资料（小饭桌用）
+};
+
+async function api(path, opts = {}) {
+  const r = await fetch("/api" + path, {
+    method: opts.method || "GET",
+    headers: {
+      "Content-Type": "application/json",
+      ...(Auth.token ? { Authorization: "Bearer " + Auth.token } : {})
+    },
+    body: opts.body ? JSON.stringify(opts.body) : undefined
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    if (r.status === 401) { Auth.clear(); renderAccountChip(); }
+    throw new Error(j.error || ("请求失败 HTTP " + r.status));
+  }
+  return j;
+}
+
+// ---- 包裹原 localStorage 读写：登录后分流到 Cloud 缓存 ----
+const _loadHistoryLS = loadHistory, _saveHistoryLS = saveHistory;
+const _loadBlacklistLS = loadBlacklist, _saveBlacklistLS = saveBlacklist;
+const _saveProfileLS = saveProfile;
+
+loadHistory = function () {
+  return (Auth.loggedIn && Cloud.history) ? Cloud.history : _loadHistoryLS();
+};
+saveHistory = function (list) {
+  if (Auth.loggedIn) { Cloud.history = list; return; }
+  _saveHistoryLS(list);
+};
+loadBlacklist = function () {
+  return (Auth.loggedIn && Cloud.blacklist) ? Cloud.blacklist : _loadBlacklistLS();
+};
+saveBlacklist = function (list) {
+  if (Auth.loggedIn) {
+    Cloud.blacklist = list;
+    // 全量替换，可安全失败重试（下次启动重新拉取）
+    api("/blacklist", { method: "PUT", body: { blacklist: list } })
+      .catch(e => showToast("黑名单同步失败：" + e.message));
+    return;
+  }
+  _saveBlacklistLS(list);
+};
+saveProfile = function (uid, p) {
+  _saveProfileLS(uid, p);
+  if (Auth.loggedIn) {
+    api("/auth/profile", { method: "PUT", body: { nickname: userDisplayName(uid), color: p.color, avatar: p.avatar } })
+      .then(({ user }) => { Auth.user = user; })
+      .catch(e => showToast("资料同步失败：" + e.message));
+  }
+};
+
+// ---- 菜单合并与切换 ----
+function activeCustomDishes() {
+  if (!Auth.loggedIn) return [];
+  if (Cloud.menuSource === "mine") return Cloud.personal;
+  return Cloud.roomDishes[Cloud.menuSource] || [];
+}
+function applyMenu() {
+  if (Auth.loggedIn && Cloud.system) {
+    FOODS = Cloud.system.concat(activeCustomDishes().map(d => ({ ...d, custom: true })));
+  }
+  recomputeDerived();
+  if (!CATS.includes(currentCat)) currentCat = "全部";
+  rebuildShopList();
+  renderGrid();
+  renderQuickStrips();
+  applyTwemoji();
+}
+function switchMenuSource(src) {
+  Cloud.menuSource = src;
+  localStorage.setItem("mealMenuSource", String(src));
+  renderMenuSourceBar();
+  applyMenu();
+}
+
+// ---- 启动：游客 UI 已渲染，这里异步拉云端 ----
+async function bootCloud() {
+  renderAccountChip();
+  renderMenuSourceBar();
+  if (!Auth.token) return;
+  const badge = showSyncBadge("云端同步中…");
+  try {
+    const [sys, me] = await Promise.all([
+      fetch("/api/system-dishes").then(r => r.json()),
+      api("/auth/me")
+    ]);
+    Auth.user = me.user;
+    Cloud.system = sys.dishes;
+    await maybeMigrate();              // 首登迁移（只跑一次）
+    const st = await api("/state");    // 迁移后重新拉全量
+    Auth.user = st.user;
+    Cloud.personal = st.dishes.personal;
+    Cloud.rooms = st.rooms;
+    Cloud.roomDishes = st.roomDishes;
+    Cloud.history = st.history;
+    Cloud.blacklist = st.blacklist;
+    const saved = localStorage.getItem("mealMenuSource");
+    Cloud.menuSource = (saved && (saved === "mine" || Cloud.roomDishes[saved])) ? saved : "mine";
+    applyMenu();
+    renderAvatar();
+    renderHomeStat();
+  } catch (e) {
+    showToast(Auth.loggedIn ? "云端同步失败，先用本地数据：" + e.message : "登录已过期，请重新登录");
+  } finally {
+    badge.remove();
+    renderAccountChip();
+    renderMenuSourceBar();
+  }
+}
+
+function showSyncBadge(text) {
+  const el = document.createElement("div");
+  el.className = "sync-badge";
+  el.textContent = "☁️ " + text;
+  document.body.appendChild(el);
+  return el;
+}
+
+// ---- 首登迁移：把当前游客的 localStorage 数据上传到个人空间（幂等） ----
+async function maybeMigrate() {
+  const flag = "mealMigrated__" + Auth.user.id;
+  if (localStorage.getItem(flag)) return;
+  const history = _loadHistoryLS();
+  const blacklist = _loadBlacklistLS();
+  // 收集餐盘+历史里出现过的非系统菜，作为自定义菜上传
+  const known = new Set(Cloud.system.map(d => d.name));
+  const custom = {};
+  [...plate.lunch, ...plate.dinner, ...history.flatMap(r => r.items)].forEach(i => {
+    if (i.name && !known.has(i.name)) custom[i.name] = { name: i.name, emoji: i.emoji, kcal: i.kcal };
+  });
+  const p = getProfile(currentUser);
+  if (history.length || blacklist.length || Object.keys(custom).length) {
+    await api("/migrate", {
+      method: "POST",
+      body: {
+        history, blacklist,
+        customDishes: Object.values(custom),
+        profile: { nickname: userDisplayName(currentUser), color: p.color, avatar: p.avatar }
+      }
+    });
+  }
+  localStorage.setItem(flag, "1");
+}
+
+// ---- 账号 chip 与登录/注册 ----
+function renderAccountChip() {
+  const chip = document.getElementById("accountChip");
+  const sel = document.getElementById("userSelect");
+  const editBtn = document.querySelector(".u-edit");
+  const uAvatar = document.getElementById("uAvatar");
+  const loggedIn = Auth.loggedIn && Auth.user;
+  chip.style.display = "flex";
+  sel.style.display = loggedIn ? "none" : "";
+  editBtn.style.display = loggedIn ? "none" : "";
+  uAvatar.style.display = loggedIn ? "none" : "";
+  if (loggedIn) {
+    document.getElementById("acName").textContent = Auth.user.nickname;
+    const av = document.getElementById("acAvatar");
+    if (Auth.user.avatar) {
+      av.style.backgroundImage = `url(${Auth.user.avatar})`;
+      av.style.backgroundColor = "transparent";
+      av.textContent = "";
+    } else {
+      av.style.backgroundImage = "none";
+      av.style.backgroundColor = Auth.user.color || "#ffab73";
+      av.textContent = Auth.user.nickname.slice(0, 1).toUpperCase();
+    }
+  } else {
+    document.getElementById("acName").textContent = "登录同步";
+    const av = document.getElementById("acAvatar");
+    av.style.backgroundImage = "none";
+    av.style.backgroundColor = "#ffcfad";
+    av.textContent = "☁️";
+  }
+  if (!loggedIn) document.getElementById("accountMenu").classList.remove("show");
+}
+
+function toggleAccountMenu(e) {
+  e.stopPropagation();
+  if (!Auth.loggedIn) { openAuthModal(); return; }
+  document.getElementById("accountMenu").classList.toggle("show");
+}
+document.addEventListener("click", () => {
+  document.getElementById("accountMenu").classList.remove("show");
+});
+
+let authMode = "login";
+function openAuthModal() {
+  document.getElementById("authModalMask").classList.add("show");
+}
+function hideAuthModal() {
+  document.getElementById("authModalMask").classList.remove("show");
+}
+function switchAuthTab(mode) {
+  authMode = mode;
+  document.getElementById("tabLogin").classList.toggle("active", mode === "login");
+  document.getElementById("tabRegister").classList.toggle("active", mode === "register");
+  document.getElementById("authNickRow").style.display = mode === "register" ? "" : "none";
+  document.getElementById("authSubmit").textContent = mode === "login" ? "登录" : "注册并登录";
+}
+async function submitAuth() {
+  const username = document.getElementById("authUser").value.trim();
+  const password = document.getElementById("authPass").value;
+  const nickname = document.getElementById("authNick").value.trim();
+  if (!username || !password) { showToast("用户名和密码都要填哦"); return; }
+  const btn = document.getElementById("authSubmit");
+  btn.disabled = true;
+  try {
+    const body = authMode === "register" ? { username, password, nickname } : { username, password };
+    const { token, user } = await api("/auth/" + authMode, { method: "POST", body });
+    Auth.setSession(token, user);
+    hideAuthModal();
+    showToast(`欢迎，${user.nickname} 🎉`);
+    bootCloud();
+  } catch (e) {
+    showToast(e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+function logoutCloud() {
+  if (!confirm("退出登录后将回到游客模式（云端数据不会丢，重新登录即可看到）")) return;
+  Auth.clear();
+  location.reload();
+}
+
+// ---- 菜单来源切换条 ----
+function renderMenuSourceBar() {
+  const bar = document.getElementById("menuSourceBar");
+  const saveBtn = document.getElementById("saveToMenuBtn");
+  if (!Auth.loggedIn || !Auth.user) {
+    bar.classList.remove("show");
+    bar.innerHTML = "";
+    if (saveBtn) saveBtn.style.display = "none";
+    return;
+  }
+  bar.classList.add("show");
+  bar.innerHTML = "";
+  const mk = (src, label) => {
+    const b = document.createElement("button");
+    b.className = "ms-btn" + (String(Cloud.menuSource) === String(src) ? " active" : "");
+    b.textContent = label;
+    b.onclick = () => switchMenuSource(src);
+    bar.appendChild(b);
+  };
+  mk("mine", "🍱 我的菜单");
+  Cloud.rooms.forEach(r => mk(r.id, "🏠 " + r.name));
+  if (saveBtn) saveBtn.style.display = "";
+}
+
+// ---- 自定义菜：存入云端菜单 / 编辑 / 删除 ----
+async function saveCustomToMenu() {
+  const name = document.getElementById("customName").value.trim();
+  const kcal = parseInt(document.getElementById("customKcal").value, 10);
+  if (!name) { showToast("先输入菜名哦"); return; }
+  if (!Number.isInteger(kcal) || kcal < 0) { showToast("先查一下或填一下热量"); return; }
+  const scope = Cloud.menuSource === "mine" ? "user" : "room";
+  try {
+    const { dish } = await api("/dishes", {
+      method: "POST",
+      body: { scope, roomId: scope === "room" ? Cloud.menuSource : undefined, name, kcal }
+    });
+    if (scope === "user") Cloud.personal.push(dish);
+    else (Cloud.roomDishes[Cloud.menuSource] = Cloud.roomDishes[Cloud.menuSource] || []).push(dish);
+    applyMenu();
+    showToast(`「${name}」已存入${scope === "user" ? "我的" : "房间"}菜单 ☁️`);
+  } catch (e) {
+    showToast(e.message);
+  }
+}
+
+async function editCustomDish(f) {
+  const action = prompt(`编辑「${f.name}」\n\n输入新热量数字 = 改热量\n输入"删"= 从菜单删除\n其他 = 取消`, f.kcal);
+  if (action === null) return;
+  const scope = Cloud.menuSource === "mine" ? "user" : "room";
+  try {
+    if (action.trim() === "删") {
+      if (!confirm(`确定把「${f.name}」从菜单里删掉吗？`)) return;
+      await api("/dishes/" + f.id, { method: "DELETE" });
+      removeCustomDishFromCache(f.id);
+      showToast(`「${f.name}」已删除`);
+    } else {
+      const kcal = parseInt(action, 10);
+      if (!Number.isInteger(kcal) || kcal < 0) { showToast("输入无效，已取消"); return; }
+      const { dish } = await api("/dishes/" + f.id, { method: "PUT", body: { kcal } });
+      const list = scope === "user" ? Cloud.personal : Cloud.roomDishes[Cloud.menuSource];
+      const idx = list.findIndex(d => d.id === f.id);
+      if (idx >= 0) list[idx] = dish;
+      showToast(`「${f.name}」热量已改为 ${kcal} kcal`);
+    }
+    applyMenu();
+  } catch (e) {
+    showToast(e.message);
+  }
+}
+function removeCustomDishFromCache(id) {
+  Cloud.personal = Cloud.personal.filter(d => d.id !== id);
+  Object.keys(Cloud.roomDishes).forEach(rid => {
+    Cloud.roomDishes[rid] = Cloud.roomDishes[rid].filter(d => d.id !== id);
+  });
+}
+
+// ---- 房间管理 ----
+function openRoomModal() {
+  document.getElementById("accountMenu").classList.remove("show");
+  renderRoomList();
+  document.getElementById("roomModalMask").classList.add("show");
+}
+function hideRoomModal() {
+  document.getElementById("roomModalMask").classList.remove("show");
+}
+function renderRoomList() {
+  const box = document.getElementById("roomList");
+  if (!Cloud.rooms.length) {
+    box.innerHTML = '<p style="font-size:13px;color:#bbb;text-align:center;padding:12px 0">还没加入任何房间</p>';
+    return;
+  }
+  box.innerHTML = "";
+  Cloud.rooms.forEach(r => {
+    const div = document.createElement("div");
+    div.className = "room-item";
+    div.innerHTML = `
+      <div>
+        <div class="ri-name">${r.name}${r.owner_id === Auth.user.id ? " 👑" : ""}</div>
+        <div class="ri-code">邀请码：${r.invite_code}</div>
+        <div class="ri-members">${r.members.map(m => m.nickname).join("、")}</div>
+      </div>
+      <div class="ri-actions">
+        <button data-act="copy">复制邀请码</button>
+        <button data-act="leave">退出</button>
+      </div>`;
+    div.querySelector('[data-act="copy"]').onclick = () => {
+      navigator.clipboard.writeText(r.invite_code)
+        .then(() => showToast("邀请码已复制 📋"))
+        .catch(() => prompt("邀请码（手动复制）：", r.invite_code));
+    };
+    div.querySelector('[data-act="leave"]').onclick = () => leaveRoom(r);
+    box.appendChild(div);
+  });
+}
+async function createRoom() {
+  const name = document.getElementById("roomNameInput").value.trim();
+  if (!name) { showToast("给房间起个名字吧"); return; }
+  try {
+    const { room } = await api("/rooms", { method: "POST", body: { name } });
+    Cloud.rooms.push(room);
+    Cloud.roomDishes[room.id] = [];
+    document.getElementById("roomNameInput").value = "";
+    renderRoomList();
+    renderMenuSourceBar();
+    showToast(`房间「${name}」建好啦，邀请码 ${room.invite_code}`);
+  } catch (e) { showToast(e.message); }
+}
+async function joinRoom() {
+  const code = document.getElementById("roomCodeInput").value.trim().toUpperCase();
+  if (code.length !== 6) { showToast("邀请码是 6 位哦"); return; }
+  try {
+    const { room } = await api("/rooms/join", { method: "POST", body: { invite_code: code } });
+    Cloud.rooms.push(room);
+    const { dishes } = await api(`/dishes?scope=room&roomId=${room.id}`);
+    Cloud.roomDishes[room.id] = dishes;
+    document.getElementById("roomCodeInput").value = "";
+    renderRoomList();
+    renderMenuSourceBar();
+    showToast(`已加入「${room.name}」🎉`);
+  } catch (e) { showToast(e.message); }
+}
+async function leaveRoom(r) {
+  if (!confirm(`确定退出「${r.name}」吗？房间里的共享菜将不再可见。`)) return;
+  try {
+    await api(`/rooms/${r.id}/leave`, { method: "POST" });
+    Cloud.rooms = Cloud.rooms.filter(x => x.id !== r.id);
+    delete Cloud.roomDishes[r.id];
+    if (String(Cloud.menuSource) === String(r.id)) Cloud.menuSource = "mine";
+    renderRoomList();
+    renderMenuSourceBar();
+    applyMenu();
+  } catch (e) { showToast(e.message); }
+}
+
+// 初始化（先按游客模式立即渲染，再异步拉取云端数据）
 renderUserSelect();
 renderAvatar();
 renderGrid();
@@ -3757,6 +4364,7 @@ renderPlate();
 renderHomeStat();
 renderQuickStrips();
 applyTwemoji();
+bootCloud();
 </script>
 </body>
 </html>

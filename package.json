@@ -1,0 +1,20 @@
+{
+  "name": "chi-shen-me",
+  "version": "1.0.0",
+  "description": "今天吃什么 —— 带云同步的干饭小站",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "dotenv": "^16.4.7"
+  }
+}
