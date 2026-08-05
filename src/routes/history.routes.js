@@ -40,7 +40,9 @@ router.post("/", wrap(async (req, res) => {
   const meal = validMeal(req.body.meal);
   const items = validItems(req.body.items);
   const total = reqInt(req.body.total, { min: 0, max: 100000, label: "总热量" });
-  const clientId = req.body.client_id ? reqInt(req.body.client_id, { min: 1, label: "client_id" }) : null;
+  const clientId = req.body.client_id
+    ? reqInt(req.body.client_id, { min: 1, max: Number.MAX_SAFE_INTEGER, label: "client_id" })
+    : null;
 
   // client_id 冲突（重复提交/迁移重放）时返回已存在记录，保持幂等
   const { rows } = await query(

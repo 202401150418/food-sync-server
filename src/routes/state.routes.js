@@ -89,7 +89,7 @@ router.post("/migrate", wrap(async (req, res) => {
 
     for (const h of history) {
       if (!Array.isArray(h.items)) continue;
-      const clientId = h.id ? reqInt(h.id, { min: 1, label: "记录 id" }) : null;
+      const clientId = h.id ? reqInt(h.id, { min: 1, max: Number.MAX_SAFE_INTEGER, label: "记录 id" }) : null;
       const r = await client.query(
         `INSERT INTO history (user_id, client_id, time, date, meal, items, total)
          VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (user_id, client_id) DO NOTHING`,
