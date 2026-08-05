@@ -1,11 +1,3762 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta http-equiv="refresh" content="0; url=吃什么.html">
-  <title>今天吃什么 🍚</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>今天吃什么 - 午饭晚饭助手</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    color: #444;
+    min-height: 100vh;
+    /* 柔和渐变底 + 圆点纹理 + Akoasm 淡水印平铺（每一面都有） */
+    background:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='200'%3E%3Ctext x='26' y='66' transform='rotate(-24 26 66)' font-family='Georgia,serif' font-size='21' letter-spacing='3' fill='%23b89a72' fill-opacity='.075'%3EAkoasm%3C/text%3E%3Ctext x='158' y='60' transform='rotate(-24 158 60)' font-size='13' fill='%23b89a72' fill-opacity='.06'%3E%F0%9F%8C%B8%3C/text%3E%3Ctext x='146' y='176' transform='rotate(-24 146 176)' font-family='Georgia,serif' font-size='21' letter-spacing='3' fill='%23b89a72' fill-opacity='.075'%3EAkoasm%3C/text%3E%3Ctext x='30' y='182' transform='rotate(-24 30 182)' font-size='13' fill='%23b89a72' fill-opacity='.06'%3E%F0%9F%8C%B8%3C/text%3E%3C/svg%3E"),
+      radial-gradient(circle at 15% 20%, rgba(255, 227, 207, .5), transparent 40%),
+      radial-gradient(circle at 85% 15%, rgba(217, 234, 251, .5), transparent 40%),
+      radial-gradient(circle at 80% 85%, rgba(217, 239, 223, .5), transparent 40%),
+      radial-gradient(circle at 15% 85%, rgba(251, 224, 230, .45), transparent 40%),
+      #fdfbf7;
+    background-attachment: fixed;
+  }
+  /* 右下角小字水印：淡淡的，浮在所有窗口之上、toast 之下 */
+  .wm-corner {
+    position: fixed; right: 12px; bottom: 9px; z-index: 98;
+    font-size: 11px; letter-spacing: 1.5px; color: #b89a72; opacity: .38;
+    pointer-events: none; user-select: none;
+    font-family: Georgia, "Times New Roman", serif;
+  }
+  /* 漂浮的食物 emoji 装饰层 */
+  .bg-deco { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+  .bg-deco span {
+    position: absolute; opacity: .14; user-select: none;
+    animation: floaty 7s ease-in-out infinite;
+  }
+  @keyframes floaty {
+    0%, 100% { transform: translateY(0) rotate(-6deg); }
+    50% { transform: translateY(-16px) rotate(6deg); }
+  }
+  header, .view { position: relative; z-index: 1; }
+
+  /* ===== 顶栏（吸顶悬浮） ===== */
+  header {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(255, 255, 255, .85);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid #eee;
+    padding: 16px 20px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .back-btn {
+    display: none; border: 1px solid #e5e5e5; background: #fff; color: #888;
+    border-radius: 18px; padding: 6px 14px; font-size: 13px; cursor: pointer;
+  }
+  .back-btn:hover { color: #ff9a55; border-color: #ffab73; }
+  header h1 { font-size: 18px; letter-spacing: 1px; color: #333; }
+  .user-box {
+    margin-left: auto; display: flex; align-items: center; gap: 8px;
+    background: #fff; border: 1px solid #e5e5e5; border-radius: 26px;
+    padding: 5px 10px 5px 5px;
+  }
+  .u-avatar {
+    width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 17px; font-weight: bold; cursor: pointer;
+    background-size: cover; background-position: center;
+    border: 2px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,.15);
+  }
+  .user-box select {
+    border: none; outline: none; background: none; font-size: 13px;
+    color: #666; cursor: pointer; font-family: inherit; max-width: 110px;
+  }
+  .u-edit {
+    border: none; background: none; cursor: pointer; font-size: 13px;
+    color: #bbb; padding: 2px;
+  }
+  .u-edit:hover { color: #ff9a55; }
+  /* 用户资料弹窗 */
+  .user-modal { padding: 26px 34px; min-width: 260px; }
+  .um-title { font-size: 17px; font-weight: bold; color: #333; margin-bottom: 14px; }
+  .um-avatar {
+    width: 84px; height: 84px; border-radius: 50%; margin: 0 auto 12px;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 34px; font-weight: bold;
+    background-size: cover; background-position: center;
+    border: 3px solid #fff; box-shadow: 0 3px 10px rgba(0,0,0,.15);
+  }
+  .um-field { margin: 14px 0; text-align: left; }
+  .um-field label { font-size: 12px; color: #999; display: block; margin-bottom: 5px; }
+  .um-field input {
+    width: 100%; padding: 9px 13px; font-size: 14px;
+    border: 1px solid #e0e0e0; border-radius: 14px; outline: none;
+  }
+  .um-field input:focus { border-color: #ffab73; }
+  .um-actions { display: flex; gap: 8px; justify-content: center; }
+
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* ===== 主界面色块 ===== */
+  .home-wrap { max-width: 900px; margin: 0 auto; padding: 28px 16px 40px; }
+  .home-hello { text-align: center; margin-bottom: 26px; }
+  .home-hello h2 { font-size: 26px; color: #333; letter-spacing: 2px; }
+  .home-hello p { margin-top: 8px; color: #999; font-size: 13px; }
+  .home-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+  .home-card {
+    border-radius: 18px; padding: 26px 22px; cursor: pointer; border: none;
+    text-align: left; transition: .2s; font-family: inherit;
+    display: flex; flex-direction: column; gap: 8px; min-height: 150px;
+  }
+  .home-card:hover { transform: translateY(-4px); box-shadow: 0 10px 24px rgba(0,0,0,.08); }
+  .home-card .hc-emoji { font-size: 38px; }
+  .home-card .hc-title { font-size: 18px; font-weight: bold; }
+  .home-card .hc-desc { font-size: 12px; opacity: .75; line-height: 1.6; }
+  /* 柔和日系浅色：蜜桃橙 / baby蓝 / 若草绿 / 樱粉 / 奶黄 */
+  .hc-orange { background: #ffe3cf; color: #c0672a; }
+  .hc-blue   { background: #d9eafb; color: #3d6c9e; }
+  .hc-green  { background: #d9efdf; color: #43825c; }
+  .hc-pink   { background: #fbe0e6; color: #b0586e; }
+  .hc-purple { background: #e9e2f8; color: #7a5bad; }
+  .hc-yellow { background: #faf0cd; color: #9a7c28; }
+
+  .home-stat {
+    margin-top: 18px; background: #fff; border: 1px solid #f0f0f0;
+    border-radius: 18px; padding: 18px 22px;
+    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;
+  }
+  .home-stat .s-label { font-size: 14px; color: #666; }
+  .home-stat .s-value { font-size: 20px; font-weight: bold; color: #43825c; }
+  .hc-green-bg { background: #d9efdf; border-color: #c8e6d2; }
+
+  /* ===== 通用 ===== */
+  .container { max-width: 1100px; margin: 0 auto; padding: 16px; display: flex; gap: 16px; align-items: flex-start; }
+  .main { flex: 1; min-width: 0; }
+  .btn {
+    padding: 10px 18px; border: none; border-radius: 24px; cursor: pointer;
+    font-size: 14px; transition: .2s; font-family: inherit;
+  }
+  .btn-lucky { background: #ffab73; color: #fff; }
+  .btn-lucky:hover { background: #ff9a55; }
+
+  /* 工具栏（吸顶，贴在顶栏下方） */
+  .toolbar {
+    display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; align-items: center;
+    position: sticky; top: 73px; z-index: 20;
+    padding: 10px 0;
+    background: linear-gradient(to bottom, rgba(253, 251, 247, .97) 80%, rgba(253, 251, 247, 0));
+    backdrop-filter: blur(6px);
+  }
+  .toolbar input[type="text"] {
+    flex: 1; min-width: 180px; padding: 10px 14px;
+    border: 1px solid #e0e0e0; border-radius: 24px; outline: none; font-size: 14px;
+    background: #fff; transition: .2s;
+  }
+  .toolbar input[type="text"]:focus { border-color: #ffab73; }
+
+  /* 分类 */
+  .categories { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .cat-btn {
+    padding: 7px 15px; border-radius: 20px; border: 1px solid #e5e5e5;
+    background: #fff; cursor: pointer; font-size: 13px; color: #666; transition: .2s;
+  }
+  .cat-btn:hover { border-color: #ffab73; color: #ff9a55; }
+  .cat-btn.active { background: #ffab73; color: #fff; border-color: #ffab73; }
+
+  /* ===== 选餐页：类美团店铺选菜 ===== */
+  .shop-layout { display: flex; gap: 14px; align-items: stretch; }
+  .shop-menu { flex: 1; min-width: 0; }
+  /* 右侧店铺栏 */
+  .shop-rail {
+    width: 172px; flex-shrink: 0; display: flex; flex-direction: column; gap: 10px;
+    position: sticky; top: 132px; align-self: flex-start;
+    max-height: calc(100vh - 150px); overflow-y: auto;
+  }
+  .shop-card {
+    background: #fff; border: 1px solid #f0f0f0; border-radius: 14px; overflow: hidden;
+  }
+  .shop-card-title {
+    padding: 10px 12px; font-size: 13px; font-weight: bold; color: #333;
+    background: linear-gradient(to right, #fff4ea, #fff);
+  }
+  .shop-item {
+    width: 100%; text-align: left; border: none; background: #fff; cursor: pointer;
+    padding: 10px 12px; font-size: 13px; color: #666; font-family: inherit;
+    border-left: 3px solid transparent; transition: .15s;
+    display: flex; justify-content: space-between; align-items: center; gap: 4px;
+  }
+  .shop-item:hover { background: #fff8f1; color: #ff9a55; }
+  .shop-item.active { border-left-color: #ff9a55; background: #fff4ea; color: #ff9a55; font-weight: bold; }
+  .shop-item .cnt { font-size: 11px; color: #ccc; font-weight: normal; }
+  .shop-item.active .cnt { color: #ffb98c; }
+  /* 餐盘下方的猜你喜欢/常吃 */
+  .plate-qs { margin-top: 12px; border-top: 1px solid #f5f5f5; padding-top: 10px; }
+  .plate-qs-title { font-size: 13px; font-weight: bold; color: #333; padding: 0 2px 2px; }
+  /* 餐盘里的 chips：竖排小条 */
+  .rail-chips { padding: 4px 0 0; display: flex; flex-direction: column; gap: 5px; }
+  .qs-chip {
+    flex-shrink: 0; display: flex; align-items: center; gap: 5px;
+    background: #fff; border: 1px solid #f0f0f0; border-radius: 12px;
+    padding: 5px 9px; cursor: pointer; font-size: 12px; color: #555; transition: .15s;
+    width: 100%; text-align: left; font-family: inherit;
+  }
+  .qs-chip:hover { border-color: #ffab73; transform: translateY(-1px); }
+  .qs-chip .q-emoji { font-size: 14px; }
+  .qs-chip .q-kcal { font-size: 11px; color: #ff9a55; }
+  .qs-empty { font-size: 12px; color: #ccc; padding: 4px 6px; }
+
+  /* 食物卡片 */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+  .card {
+    background: #fff; border-radius: 10px; padding: 8px 8px 9px;
+    border: 1px solid #f0f0f0; position: relative;
+    display: flex; flex-direction: column; gap: 2px; transition: .2s;
+  }
+  .card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,.06); }
+  .card .btn-ban {
+    position: absolute; top: 3px; right: 3px;
+    border: none; background: none; color: #ddd; cursor: pointer; font-size: 11px;
+    padding: 2px 3px; border-radius: 8px;
+  }
+  .card .btn-ban:hover { color: #e00; background: #fdf0f0; }
+  .card .emoji { font-size: 24px; text-align: center; }
+  .card .name { font-weight: bold; text-align: center; font-size: 12.5px; color: #333; }
+  .card .kcal { text-align: center; font-size: 11px; color: #ff9a55; }
+  .card .cat-tag { text-align: center; font-size: 10px; color: #ccc; }
+  .card .btn-add {
+    margin-top: 3px; background: #fff; color: #ff9a55; border: 1px solid #ffcfad;
+    border-radius: 14px; padding: 4px 0; cursor: pointer; font-size: 12px; transition: .2s;
+  }
+  .card .btn-add:hover { background: #ffab73; color: #fff; border-color: #ffab73; }
+
+  /* 自定义食物面板 */
+  .custom-panel {
+    background: #fff; border: 1px solid #f0f0f0; border-radius: 12px;
+    margin-bottom: 14px; overflow: hidden;
+  }
+  .custom-title {
+    padding: 11px 16px; font-size: 14px; color: #666; cursor: pointer;
+    display: flex; justify-content: space-between; align-items: center;
+    user-select: none;
+  }
+  .custom-title:hover { color: #ff9a55; }
+  .custom-body { padding: 0 16px 14px; display: none; }
+  .custom-body.open { display: block; }
+  .custom-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .custom-row input[type="text"] {
+    flex: 1; min-width: 160px; padding: 9px 14px; font-size: 14px;
+    border: 1px solid #e0e0e0; border-radius: 20px; outline: none;
+  }
+  .custom-row input[type="text"]:focus { border-color: #ffab73; }
+  .custom-result { display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+  .custom-result span { font-size: 13px; color: #666; }
+  .custom-result input[type="number"] {
+    width: 100px; padding: 8px 12px; font-size: 14px;
+    border: 1px solid #e0e0e0; border-radius: 18px; outline: none;
+  }
+  .custom-result input[type="number"]:focus { border-color: #ffab73; }
+  .custom-tip { font-size: 12px; color: #bbb; margin-top: 8px; }
+
+  /* 餐盘 */
+  .plate {
+    width: 300px; flex-shrink: 0; background: #fff; border-radius: 14px;
+    padding: 16px; border: 1px solid #f0f0f0;
+    position: sticky; top: 132px;
+    max-height: calc(100vh - 150px); overflow-y: auto;
+  }
+  .plate h2 { font-size: 17px; text-align: center; margin-bottom: 4px; color: #333; }
+  .plate .meal-switch { display: flex; gap: 6px; justify-content: center; margin: 10px 0; }
+  .meal-btn {
+    padding: 6px 14px; border-radius: 16px; border: 1px solid #e5e5e5;
+    background: #fff; cursor: pointer; font-size: 13px; color: #666;
+  }
+  .meal-btn.active { background: #ffab73; color: #fff; border-color: #ffab73; }
+  .plate-items { max-height: 280px; overflow-y: auto; margin: 10px 0; }
+  .plate-empty { text-align: center; color: #bbb; font-size: 13px; padding: 24px 0; }
+  .plate-item {
+    display: flex; align-items: center; gap: 6px; padding: 8px 2px;
+    border-bottom: 1px dashed #f0f0f0; font-size: 13px;
+  }
+  .plate-item .p-name { flex: 1; color: #444; }
+  .plate-item .p-kcal { color: #ff9a55; font-size: 12px; white-space: nowrap; }
+  .qty-btn {
+    width: 22px; height: 22px; border-radius: 50%; border: 1px solid #e0e0e0;
+    background: #fff; cursor: pointer; font-size: 13px; line-height: 1; color: #888;
+  }
+  .qty-btn:hover { border-color: #ffab73; color: #ff9a55; }
+  .plate-total {
+    border-top: 1px solid #eee; padding-top: 10px; margin-top: 6px;
+    font-size: 14px; display: flex; justify-content: space-between; font-weight: bold; color: #333;
+  }
+  .plate-advice { font-size: 12px; color: #999; margin-top: 8px; line-height: 1.6; }
+  .plate-actions { display: flex; gap: 8px; margin-top: 10px; }
+  .btn-record {
+    flex: 1; padding: 9px 0; border: none; border-radius: 20px;
+    background: #ffab73; color: #fff; cursor: pointer; font-size: 13px;
+  }
+  .btn-record:hover { background: #ff9a55; }
+  .btn-clear {
+    flex: 1; padding: 9px 0; border: 1px solid #e5e5e5; border-radius: 20px;
+    background: #fff; color: #999; cursor: pointer; font-size: 13px;
+  }
+  .btn-clear:hover { color: #666; border-color: #ccc; }
+
+  /* 历史记录页 */
+  .page-wrap { max-width: 800px; margin: 0 auto; padding: 20px 16px 40px; }
+  .panel { background: #fff; border: 1px solid #f0f0f0; border-radius: 14px; padding: 18px 22px; }
+  .panel-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+  .panel-head h2 { font-size: 17px; color: #333; }
+  .today-stat { font-size: 13px; color: #ff9a55; }
+  .btn-clear-history {
+    padding: 6px 14px; border: 1px solid #e5e5e5; border-radius: 16px;
+    background: #fff; color: #999; cursor: pointer; font-size: 12px;
+  }
+  .btn-clear-history:hover { color: #e00; border-color: #f5b5b5; }
+  .history-list { margin-top: 12px; }
+  .history-empty { text-align: center; color: #bbb; font-size: 13px; padding: 24px 0; }
+  .h-item {
+    display: flex; align-items: center; gap: 10px; padding: 10px 0;
+    border-bottom: 1px dashed #f0f0f0; font-size: 13px; flex-wrap: wrap;
+  }
+  .h-time { color: #aaa; font-size: 12px; white-space: nowrap; }
+  .h-meal {
+    padding: 2px 10px; border-radius: 12px; font-size: 12px; white-space: nowrap;
+    background: #fff4ea; color: #ff9a55;
+  }
+  .h-meal.dinner { background: #f0f4ff; color: #7b9de0; }
+  .h-foods { flex: 1; color: #555; min-width: 120px; }
+  .h-kcal { color: #ff9a55; font-weight: bold; white-space: nowrap; }
+  .h-del { border: none; background: none; color: #ccc; cursor: pointer; font-size: 14px; }
+  .h-del:hover { color: #e00; }
+  .h-review {
+    width: 100%; font-size: 12px; color: #a88c6d; line-height: 1.6;
+    background: #fffaf3; border-radius: 10px; padding: 6px 10px; margin-top: 4px;
+  }
+
+  /* BMI 页 */
+  .bmi-form { display: flex; flex-direction: column; gap: 14px; margin-top: 16px; }
+  .bmi-field { display: flex; flex-direction: column; gap: 6px; }
+  .bmi-field label { font-size: 13px; color: #888; }
+  .bmi-field input {
+    padding: 11px 14px; font-size: 15px; border: 1px solid #e0e0e0;
+    border-radius: 12px; outline: none;
+  }
+  .bmi-field input:focus { border-color: #a585e0; }
+  .btn-bmi {
+    margin-top: 4px; padding: 12px 0; border: none; border-radius: 24px;
+    background: #a585e0; color: #fff; font-size: 15px; cursor: pointer; transition: .2s;
+  }
+  .btn-bmi:hover { background: #9470d6; }
+  .bmi-result { display: none; margin-top: 20px; }
+  .bmi-num {
+    text-align: center; font-size: 44px; font-weight: bold; color: #7a5bad;
+  }
+  .bmi-tag { text-align: center; margin-top: 6px; }
+  .bmi-tag span {
+    display: inline-block; padding: 4px 16px; border-radius: 16px; font-size: 14px;
+  }
+  .tag-thin { background: #d9eafb; color: #3d6c9e; }
+  .tag-normal { background: #d9efdf; color: #43825c; }
+  .tag-fat { background: #ffe3cf; color: #c0672a; }
+  .tag-obese { background: #fbdcdc; color: #b84545; }
+  .bmi-bar { margin: 18px 8px 4px; height: 8px; border-radius: 4px;
+    background: linear-gradient(to right, #a9cdf0 0 25%, #aedcc0 25% 50%, #f2c49b 50% 75%, #e8a1a1 75% 100%);
+    position: relative;
+  }
+  .bmi-pointer {
+    position: absolute; top: -6px; width: 4px; height: 20px;
+    background: #333; border-radius: 2px; transform: translateX(-2px); transition: .3s;
+  }
+  .bmi-scale { display: flex; justify-content: space-between; font-size: 11px; color: #aaa; margin: 6px 8px 0; }
+  .bmi-advice {
+    margin-top: 16px; background: #faf7ff; border-radius: 12px;
+    padding: 14px 16px; font-size: 13px; color: #666; line-height: 1.8;
+  }
+  /* 性别切换 */
+  .sex-switch { display: flex; gap: 8px; }
+  .sex-btn {
+    flex: 1; padding: 10px 0; border-radius: 12px; border: 1px solid #e0e0e0;
+    background: #fff; cursor: pointer; font-size: 14px; color: #888;
+    font-family: inherit; transition: .15s;
+  }
+  .sex-btn.active { background: #a585e0; color: #fff; border-color: #a585e0; }
+  /* 体脂率结果块 */
+  .bf-block {
+    margin-top: 26px; padding-top: 18px; border-top: 1px dashed #e5ddf2;
+  }
+  .bf-title { text-align: center; font-size: 14px; font-weight: bold; color: #7a5bad; }
+  .bf-num {
+    text-align: center; font-size: 36px; font-weight: bold; color: #5b8dd9; margin-top: 4px;
+  }
+  .bf-num small { font-size: 18px; margin-left: 2px; }
+  .bf-bar {
+    background: linear-gradient(to right, #a9cdf0 0 25%, #aedcc0 25% 50%, #f2c49b 50% 75%, #e8a1a1 75% 100%);
+  }
+  .tag-bf-low { background: #d9eafb; color: #3d6c9e; }
+  .tag-bf-normal { background: #d9efdf; color: #43825c; }
+  .tag-bf-high { background: #ffe3cf; color: #c0672a; }
+  .tag-bf-vhigh { background: #fbdcdc; color: #b84545; }
+
+  /* ===== 小饭桌：日式 Omakase 吧台 ===== */
+  .table-scene {
+    position: relative; width: 720px; height: 470px; max-width: 97vw; margin: 28px auto 12px;
+    border-radius: 20px; overflow: hidden;
+    /* 墙面：暖色竖纹木板；底部 12% 是深色木地板，一条压边线分隔 */
+    background:
+      linear-gradient(to bottom, rgba(255, 240, 214, .5), rgba(244, 222, 186, .65)),
+      repeating-linear-gradient(90deg,
+        #f3e3c6 0 46px, #ecdab8 46px 48px);
+    border: 1px solid #ecdcc0;
+  }
+  /* 地板层：横铺木纹 + 踢脚线，与墙面区分（向上多延 2px 盖住桌板接缝） */
+  .table-scene::before {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: calc(20% + 2px);
+    background:
+      linear-gradient(to bottom, rgba(96, 64, 28, .35) 0 8px, transparent 26px),   /* 桌后落地阴影 → 拉开桌与地板 */
+      linear-gradient(to bottom, #8a6136 0 3px, transparent 3px),   /* 踢脚线压边 */
+      repeating-linear-gradient(0deg, rgba(96, 64, 28, .22) 0 2px, transparent 2px 14px),
+      repeating-linear-gradient(90deg, rgba(96, 64, 28, .18) 0 2px, transparent 2px 60px),
+      linear-gradient(to bottom, #c79a5e, #a87c44);   /* 比桌板更深更偏棕，区分明显 */
+    z-index: 0;
+  }
+  /* 餐厅背景层 */
+  .restaurant-bg { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
+  /* 吊灯三盏 */
+  .bg-lamps { position: absolute; top: 0; left: 0; right: 0; display: flex; justify-content: space-evenly; }
+  .lamp {
+    width: 2px; height: 34px; background: #c9b291; position: relative;
+  }
+  .lamp i {
+    position: absolute; left: 50%; top: 100%; transform: translateX(-50%);
+    width: 26px; height: 16px; border-radius: 4px 4px 13px 13px;
+    background: linear-gradient(to bottom, #e8b04b, #d89a35);
+    box-shadow: 0 8px 18px 4px rgba(255, 205, 100, .55);   /* 暖光 */
+  }
+  /* 暖帘（のれん） */
+  .bg-noren {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 4px;
+  }
+  .bg-noren span {
+    width: 44px; height: 52px;
+    background: linear-gradient(to bottom, #7f9dbf, #7494b6);
+    color: #fff; font-size: 20px; font-weight: bold;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 0 0 6px 6px;
+    box-shadow: 0 3px 6px rgba(90, 110, 140, .3);
+    animation: norenSway 4s ease-in-out infinite;
+  }
+  .bg-noren span:nth-child(2) { animation-delay: .4s; }
+  .bg-noren span:nth-child(3) { animation-delay: .8s; }
+  @keyframes norenSway {
+    0%, 100% { transform: skewX(0deg); }
+    50% { transform: skewX(2.5deg); }
+  }
+  /* 挂墙厨具：挂杆 + 锅铲/汤勺/煎锅，简约手绘 */
+  .bg-tools {
+    position: absolute; top: 80px; left: 20%;
+    display: flex; align-items: flex-start; gap: 12px;
+    z-index: 1;
+  }
+  .bg-tools::before {   /* 挂杆 */
+    content: ""; position: absolute; left: -6px; right: -6px; top: 0; height: 4px;
+    border-radius: 2px; background: #b08c5a;
+    box-shadow: 0 1px 2px rgba(0,0,0,.15);
+  }
+  .tool { position: relative; filter: drop-shadow(0 2px 2px rgba(90, 60, 20, .2)); }
+  .tool::before {   /* 挂环 */
+    content: ""; position: absolute; left: 50%; top: 2px; transform: translateX(-50%);
+    width: 6px; height: 6px; border: 2px solid #a08c70; border-radius: 50%;
+    background: transparent;
+  }
+  .tool svg { display: block; margin-top: 8px; }
+  /* 轻轻摇晃 */
+  .tool { transform-origin: 50% 5px; animation: toolSway 5s ease-in-out infinite; }
+  .tool:nth-child(2) { animation-delay: 1.2s; }
+  .tool:nth-child(3) { animation-delay: 2.4s; }
+  @keyframes toolSway {
+    0%, 100% { transform: rotate(-2deg); }
+    50% { transform: rotate(2deg); }
+  }
+  /* 右侧墙上的简约风景海报：木框挂画，横向小幅 · 樱花富士 */
+  .bg-poster {
+    position: absolute; top: 70px; right: calc(4.5% + 110px);
+    width: 84px; height: 58px; z-index: 2;
+    background: #fdf8ee;
+    border: 3px solid #b08c5a; border-radius: 3px;
+    box-shadow: 0 3px 8px rgba(90, 60, 20, .22), inset 0 0 0 2px #f4e8d2;
+    transform: rotate(1.2deg);
+    overflow: hidden;
+  }
+  /* 挂绳 */
+  .bg-poster::before {
+    content: ""; position: absolute; left: 50%; top: -9px; transform: translateX(-50%);
+    width: 14px; height: 9px; z-index: -1;
+    border: 2px solid #a08c70; border-bottom: none; border-radius: 8px 8px 0 0;
+  }
+  .poster-sky {
+    position: absolute; inset: 0;
+    background: linear-gradient(to bottom, #fbe3c2 0%, #fad4b8 45%, #f6c0b4 75%, #f0b3ad 100%);
+  }
+  .poster-sun {
+    position: absolute; left: 24%; top: 28%; transform: translateX(-50%);
+    width: 12px; height: 12px; border-radius: 50%;
+    background: radial-gradient(circle at 40% 35%, #fff3d8, #f7b84e 70%);
+    box-shadow: 0 0 7px 2px rgba(255, 200, 110, .5);
+  }
+  /* 远山（后层，更淡） */
+  .poster-mt-back {
+    position: absolute; bottom: 26%; left: 38%;
+    width: 58%; height: 36%;
+    background: #d3a8a8; opacity: .7;
+    clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  }
+  /* 富士山（前层） */
+  .poster-mt {
+    position: absolute; bottom: 22%; left: -2%;
+    width: 56%; height: 44%;
+    background: linear-gradient(to bottom, #eef2f6 0 26%, #8298b0 26% 100%);
+    clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  }
+  /* 樱花树：右侧一棵，棕色枝干 + 粉色花冠 */
+  .poster-sakura {
+    position: absolute; right: 4%; bottom: 20%;
+    width: 24px; height: 30px;
+  }
+  .poster-sakura::before {   /* 枝干 */
+    content: ""; position: absolute; left: 46%; bottom: 0;
+    width: 3px; height: 46%;
+    background: #8a6248; border-radius: 2px;
+    transform: rotate(4deg);
+  }
+  .poster-sakura::after {    /* 花冠：三团圆叠加 */
+    content: ""; position: absolute; left: 0; top: 0;
+    width: 16px; height: 16px; border-radius: 50%;
+    background: #f4b8c8;
+    box-shadow: 8px -4px 0 -1px #f6c4d2, 12px 4px 0 -3px #f2aec2,
+                4px 6px 0 -4px #f6c4d2;
+  }
+  /* 飘落的樱花花瓣 */
+  .poster-petal {
+    position: absolute; width: 4px; height: 4px;
+    background: #f6bfcf; border-radius: 60% 0 60% 60%;
+    opacity: .9;
+  }
+  .poster-petal.p1 { left: 58%; top: 30%; transform: rotate(30deg); }
+  .poster-petal.p2 { left: 66%; top: 46%; transform: rotate(-20deg) scale(.8); }
+  .poster-petal.p3 { left: 48%; top: 58%; transform: rotate(55deg) scale(.7); opacity: .7; }
+  /* 山脚水面/地面 + 倒影 */
+  .poster-ground {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 22%;
+    background: linear-gradient(to bottom, #9db8c9, #b9cdd8);
+  }
+  .poster-ground::before {
+    content: ""; position: absolute; left: 10%; right: 14%; top: 2px; height: 2px;
+    background: rgba(255,255,255,.7); border-radius: 2px;
+    box-shadow: 10px 4px 0 rgba(255,255,255,.45), -6px 8px 0 rgba(255,255,255,.3);
+  }
+  /* 两只飞鸟 */
+  .poster-bird {
+    position: absolute; top: 14%; width: 7px; height: 4px;
+    border-top: 2px solid #8a6a4f; border-radius: 50%;
+  }
+  .poster-bird.b1 { left: 46%; transform: rotate(-6deg); }
+  .poster-bird.b2 { left: 56%; top: 20%; transform: scale(.7) rotate(4deg); }
+
+  /* 挂墙菜单牌 */
+  .bg-menu-board {
+    position: absolute; top: 88px; left: 4%;
+    z-index: 2;   /* 推荐牌压在厨具之上 */
+    background: #fffdf6; border: 3px solid #c9a26b; border-radius: 8px;
+    padding: 8px 14px; font-size: 12px; color: #7a6440; line-height: 1.9;
+    box-shadow: 0 4px 8px rgba(0,0,0,.08);
+    transform: rotate(-1.5deg);
+  }
+  .bmb-title {
+    text-align: center; font-weight: bold; color: #a06a28; font-size: 13px;
+    border-bottom: 1px dashed #d9c49a; margin-bottom: 4px; padding-bottom: 2px;
+  }
+  /* 角落绿植：简约手绘风盆栽，坐在桌面右端（盆底贴台面） */
+  .bg-plant {
+    position: absolute; bottom: calc(66% - 8px); right: 3%;
+    width: 46px; z-index: 3;
+    filter: drop-shadow(0 3px 4px rgba(90, 110, 70, .18));
+  }
+  /* 吧台：台面+厚度一体（厚度感体现在顶部内侧阴影，不靠侧面） */
+  .bar-counter {
+    position: absolute; left: 50%; top: calc(34% + 6px); transform: translateX(-50%);
+    width: 98%; height: calc(22% + 18px - 6px); border-radius: 16px;   /* 顶边下移 6px，底边位置不变 */
+    /* 桌面：偏奶黄的浅色原木，与深棕地板拉开明度差 */
+    background: linear-gradient(165deg,
+      #fbe9c2 0%, #f6dda6 45%, #efd094 calc(100% - 20px),
+      #e3bd7c calc(100% - 8px), #d3a35e 100%);
+    border: 3px solid #e6c084; border-bottom-color: #c1904f;
+    box-shadow:
+      0 12px 24px rgba(180, 140, 70, .25),
+      0 2px 0 rgba(255, 248, 225, .55) inset,              /* 台面前沿受光高光 */
+      inset 0 -14px 18px -6px rgba(140, 95, 40, .35);   /* 顶部远沿内阴影 → 厚度感 */
+    z-index: 2;   /* 台面盖住厨师下半身：厨师站在台后 */
+  }
+  /* 台面上的木纹细线（只画在台面区，不延伸到厚沿） */
+  .bar-counter::before {
+    content: ""; position: absolute; left: 6px; right: 6px; top: 6px; bottom: 24px;
+    border-radius: 12px;
+    background:
+      repeating-linear-gradient(178deg,
+        transparent 0 12px, rgba(190, 150, 80, .12) 12px 13px);
+    border: 1px solid rgba(220, 178, 115, .5);
+    pointer-events: none;
+  }
+  /* 桌子正面挡板：从台面垂到地板的一整面木板，与台面同色延续 */
+  .bar-front {
+    position: absolute; left: 50%; top: calc(34% + 22% + 14px);
+    transform: translateX(-50%);
+    width: 96%; height: calc(100% - 34% - 22% - 14px - 20% - 2px);   /* 地板抬高 2px，挡板同步收短 */
+    border-radius: 0 0 10px 10px;
+    background:
+      linear-gradient(to bottom, rgba(255, 244, 214, .28), transparent 30%),   /* 上部受光，越往下越暗 */
+      repeating-linear-gradient(90deg,
+        transparent 0 58px, rgba(130, 86, 36, .22) 58px 60px),   /* 竖板缝 */
+      linear-gradient(to bottom, #e6c084, #d4a768 60%, #bd8f4e);
+    border: 3px solid #b9864a; border-top: none;
+    box-shadow: inset 0 10px 14px -8px rgba(120, 80, 35, .5),   /* 顶部与台面接缝阴影 */
+                inset 0 -12px 16px -10px rgba(90, 58, 24, .45), /* 底部贴地接触阴影 */
+                inset -6px 0 10px -6px rgba(255,255,255,.3),
+                0 6px 12px rgba(120, 85, 40, .2);
+    z-index: 1;   /* 在台面之下、地板之上 */
+    pointer-events: none;
+  }
+  /* 吧台后的厨师（站在台后，下半身被台面遮挡） */
+  .chef {
+    position: absolute; left: 50%; top: calc(9% + 14px); transform: translateX(-50%); z-index: 1;
+  }
+  /* 厨师的趣味说话气泡 */
+  .chef-bubble {
+    position: absolute; left: 78%; top: 2px;
+    background: #fff; border: 2px solid #e8d9be; border-radius: 14px;
+    padding: 6px 14px; font-size: 12px; color: #6b5a3e;
+    box-shadow: 0 4px 10px rgba(0,0,0,.08);
+    opacity: 0; transform: translateY(6px) scale(.9); transform-origin: left bottom;
+    transition: opacity .25s, transform .25s;
+    pointer-events: none; z-index: 6;
+    white-space: nowrap; line-height: 1.5; text-align: left;
+  }
+  .chef-bubble.show { opacity: 1; transform: translateY(0) scale(1); }
+  .chef-bubble::before {   /* 气泡小尾巴 */
+    content: ""; position: absolute; left: -8px; bottom: 10px;
+    border: 5px solid transparent; border-right-color: #fff;
+    filter: drop-shadow(-2px 0 0 #e8d9be);
+  }
+  .chef-svg {
+    width: 124px; height: auto; display: block;
+    filter: drop-shadow(0 4px 6px rgba(180, 140, 40, .25));
+    animation: chefBob 1.4s ease-in-out infinite;
+  }
+  @keyframes chefBob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+  }
+  /* 右臂持铲不停搅拌 */
+  .arm-stir {
+    transform-box: fill-box;
+    transform-origin: left center;
+    animation: stirArm 1s ease-in-out infinite;
+  }
+  @keyframes stirArm {
+    0%, 100% { transform: rotate(-16deg); }
+    50% { transform: rotate(16deg) translateY(2px); }
+  }
+  /* 左手手巾轻轻摆动 */
+  .arm-stir-l {
+    transform-box: fill-box;
+    transform-origin: center top;
+    animation: towelSway 2.4s ease-in-out infinite;
+  }
+  @keyframes towelSway {
+    0%, 100% { transform: rotate(-4deg); }
+    50% { transform: rotate(4deg); }
+  }
+  /* 吃到东西的开心弹跳 */
+  .seat.yum .face { animation: yumBounce .5s ease; }
+  @keyframes yumBounce {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.25) rotate(-6deg); }
+    70% { transform: scale(.95) rotate(4deg); }
+    100% { transform: scale(1); }
+  }
+  /* 锅边飘起的香气：半透明白色波浪线条，缓缓上升淡出 */
+  .steam {
+    position: absolute; left: 57%; top: 20%;
+    display: flex; gap: 9px; z-index: 3; pointer-events: none;
+  }
+  .steam i {
+    width: 7px; height: 26px; border-radius: 50%;
+    border: 2px solid transparent; border-left-color: rgba(255, 255, 255, .85);
+    opacity: 0; transform: rotate(12deg);
+    animation: steamUp 2.6s ease-in-out infinite;
+    filter: blur(.4px);
+  }
+  .steam i:nth-child(2) { animation-delay: .9s; height: 32px; }
+  .steam i:nth-child(3) { animation-delay: 1.7s; }
+  @keyframes steamUp {
+    0%   { transform: translateY(8px) rotate(4deg) scale(.8); opacity: 0; }
+    35%  { opacity: .7; }
+    70%  { transform: translateY(-12px) rotate(-8deg) scale(1); opacity: .45; }
+    100% { transform: translateY(-26px) rotate(10deg) scale(1.1); opacity: 0; }
+  }
+  /* 吧台座位（高脚凳 + 食客 + 面前的食物堆，可点击换座） */
+  .seat {
+    position: absolute; transform: translate(-50%, -50%);
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    cursor: pointer;
+    z-index: 3;
+  }
+  .seat:hover .face { box-shadow: 0 0 0 3px #ffcfad, 0 4px 10px rgba(0,0,0,.12); }
+  @keyframes nom {
+    0%, 100% { transform: translateY(0); }
+    30% { transform: translateY(-6px); }
+    45% { transform: translateY(-3px) scale(1.04); }
+  }
+  .seat .face {
+    width: 56px; height: 56px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 23px; font-weight: bold; color: #fff;
+    background-size: cover; background-position: center;
+    border: 3px solid #fff;
+    box-shadow: 0 4px 10px rgba(0,0,0,.12);
+    animation: nom 1.6s ease-in-out infinite;
+    transition: box-shadow .2s;
+  }
+  .seat .s-name {
+    position: absolute; top: 74px; left: 50%; transform: translateX(-50%);
+    font-size: 11px; color: #666; background: rgba(255,255,255,.9);
+    padding: 2px 8px; border-radius: 10px; white-space: nowrap;
+    border: 1px solid #f0f0f0; max-width: 90px; overflow: hidden; text-overflow: ellipsis;
+    z-index: 2;   /* 压在椅子腿（stool::after）之上；整个座位层低于猫咪，名字自然在猫下面 */
+  }
+  .seat .s-rice {
+    position: absolute; top: -12px; right: -2px; font-size: 16px;
+    animation: riceWiggle 1.2s ease-in-out infinite;
+  }
+  @keyframes riceWiggle {
+    0%, 100% { transform: rotate(-10deg); }
+    50% { transform: rotate(12deg) translateY(-3px); }
+  }
+  /* 高脚凳 */
+  .seat .stool {
+    width: 44px; height: 11px; border-radius: 6px;
+    background: linear-gradient(to bottom, #c98d5e, #b5793f);
+    box-shadow: 0 3px 5px rgba(0,0,0,.15);
+    position: relative;
+  }
+  .seat .stool::after {
+    content: ""; position: absolute; left: 50%; top: 100%; transform: translateX(-50%);
+    width: 6px; height: 42px; background: #a06a38; border-radius: 0 0 3px 3px;
+    z-index: 1;   /* 椅腿压在名字牌（z-index:2）之下 */
+  }
+  /* 空座位 */
+  .seat.empty-seat .face {
+    background: #f3ede2; color: #c9bda8; border-style: dashed; border-color: #ddd2bf;
+    font-size: 20px; animation: none;
+  }
+  /* 面前吧台上的食物堆（emoji 重叠堆积，可点开看明细），底下垫一只大碟子 */
+  .food-pile {
+    position: absolute; bottom: 123px; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: flex-end; justify-content: center;
+    height: 32px; cursor: pointer; z-index: 4; min-width: 60px;
+  }
+  /* 大碟子：白瓷浅盘，放大，俯视 45° 视角（近深远浅的椭圆） */
+  .food-pile::before {
+    content: ""; position: absolute; left: 50%; bottom: -9px; transform: translateX(-50%);
+    width: 108px; height: 60px; border-radius: 50%;
+    background: radial-gradient(ellipse 50% 42% at 50% 34%, #ffffff 0 60%, #e8edf3 78%, #ccd6e2 92%, #aebbcc 100%);
+    box-shadow: 0 7px 12px rgba(0,0,0,.18), inset 0 -4px 7px rgba(150, 168, 190, .35);
+    z-index: -1;
+  }
+  /* 碟子内圈（随 45° 视角同心椭圆） */
+  .food-pile::after {
+    content: ""; position: absolute; left: 50%; bottom: 1px; transform: translateX(-50%);
+    width: 74px; height: 40px; border-radius: 50%;
+    border: 2px solid rgba(140, 160, 185, .45);
+    z-index: -1;
+  }
+  .food-pile .fp-emoji {
+    font-size: 24px; margin-left: -10px; position: relative;
+    filter: drop-shadow(0 2px 2px rgba(0,0,0,.12));
+    transition: transform .15s;
+  }
+  .food-pile .fp-emoji:first-child { margin-left: 0; }
+  .food-pile:hover .fp-emoji { transform: translateY(-3px); }
+  .food-pile .fp-more {
+    font-size: 10px; color: #a88c6d; background: #fff6e8;
+    border: 1px solid #f0ddba; border-radius: 8px; padding: 1px 5px;
+    margin-left: 3px; white-space: nowrap;
+  }
+  /* 角落打瞌睡的小猫图片：可提起，松手下落回原高度；右键出菜单 */
+  .bg-cat {
+    position: absolute; right: 3%; bottom: 3.5%;
+    width: 72px; z-index: 5; cursor: grab;
+    filter: drop-shadow(0 3px 4px rgba(90, 60, 20, .18));
+    touch-action: none;
+  }
+  .bg-cat.dragging { cursor: grabbing; z-index: 8; }
+  .bg-cat.dragging img { animation: none; scale: 1.06; }
+  .bg-cat.falling { transition: top .45s cubic-bezier(.5, 0, .6, 1.4); }  /* 带一点回弹的落地 */
+  .bg-cat img {
+    width: 100%; display: block; pointer-events: none;
+    transform-origin: 50% 85%;
+    animation: catSquish 2.8s ease-in-out infinite, catHeadBob 3.6s ease-in-out infinite;
+  }
+  @keyframes catSquish {
+    0%, 100% { scale: 1 1; }
+    50% { scale: 1.05 .93; }   /* 压扁变宽一点 */
+  }
+  /* 摇头晃脑：左右歪头 + 轻微点头 */
+  @keyframes catHeadBob {
+    0%, 100% { rotate: 0deg; translate: 0 0; }
+    25% { rotate: 5deg; translate: 0 1px; }
+    50% { rotate: 0deg; translate: 0 2px; }
+    75% { rotate: -5deg; translate: 0 1px; }
+  }
+  /* 摸一摸：小猫右上方冒出的爱心 */
+  .cat-heart {
+    position: absolute; left: calc(100% + 2px); top: -6px;
+    font-size: 18px; pointer-events: none; z-index: 9;
+    animation: heartFloat 1.3s ease-out forwards;
+    filter: drop-shadow(0 2px 3px rgba(255, 100, 130, .35));
+  }
+  .cat-heart.h2 { font-size: 13px; left: calc(100% + 14px); top: 4px; animation-delay: .15s; }
+  .cat-heart.h3 { font-size: 10px; left: calc(100% - 4px); top: 10px; animation-delay: .3s; }
+  @keyframes heartFloat {
+    0%   { opacity: 0; transform: translateY(6px) scale(.4); }
+    25%  { opacity: 1; transform: translateY(-2px) scale(1.15); }
+    70%  { opacity: 1; transform: translateY(-16px) scale(1); }
+    100% { opacity: 0; transform: translateY(-30px) scale(.85); }
+  }
+  /* 右键小猫菜单（小窗在猫咪右上方，不遮挡猫） */
+  .cat-menu {
+    position: absolute; z-index: 40; width: 216px;
+    background: #fffdf8; border: 1px solid #f0e2c8; border-radius: 14px;
+    box-shadow: 0 8px 22px rgba(90, 60, 20, .22);
+    padding: 12px 14px; font-size: 13px; color: #555;
+    animation: pop .18s ease;
+  }
+  .cat-menu .cm-title {
+    font-weight: bold; color: #6b5a3e; font-size: 13px;
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;
+  }
+  .cat-menu .cm-close {
+    border: none; background: none; color: #ccc; cursor: pointer; font-size: 14px;
+  }
+  .cat-menu .cm-close:hover { color: #e00; }
+  .cm-btn {
+    width: 100%; text-align: left; border: 1px solid #f0e2c8; background: #fff;
+    border-radius: 10px; padding: 7px 10px; font-size: 13px; color: #555;
+    cursor: pointer; font-family: inherit; margin-bottom: 6px; transition: .15s;
+  }
+  .cm-btn:hover { border-color: #ffab73; color: #ff9a55; background: #fff8f1; }
+  /* 饱腹进度条：渐变颜色（绿→金→橙红） */
+  .cm-bar {
+    height: 9px; border-radius: 5px; background: #f3ede2;
+    overflow: hidden; margin-top: 8px;
+  }
+  .cm-bar-fill {
+    height: 100%; border-radius: 5px; width: 0%;
+    background: linear-gradient(to right, #aedcc0, #ffd98a 55%, #ff9a55 85%, #ff7a5c);
+    background-size: 216px 100%;
+    transition: width .4s ease;
+  }
+  .cm-bar-label { font-size: 11px; color: #a88c6d; margin-top: 4px; text-align: right; }
+  /* 投喂列表 */
+  .cm-feed-list { max-height: 150px; overflow-y: auto; margin-bottom: 4px; }
+  .cm-feed-item {
+    width: 100%; display: flex; align-items: center; gap: 6px;
+    border: 1px solid #f0f0f0; background: #fff; border-radius: 10px;
+    padding: 6px 9px; font-size: 12px; color: #555; cursor: pointer;
+    font-family: inherit; margin-bottom: 5px; text-align: left; transition: .15s;
+  }
+  .cm-feed-item:hover:not(:disabled) { border-color: #ffab73; transform: translateY(-1px); }
+  .cm-feed-item:disabled { opacity: .45; cursor: not-allowed; }
+  .cm-feed-item .fk { margin-left: auto; color: #ff9a55; white-space: nowrap; }
+  .cm-feed-item .fed-tag { margin-left: auto; color: #bbb; font-size: 11px; white-space: nowrap; }
+  .cm-tip { font-size: 12px; color: #a88c6d; line-height: 1.6; padding: 6px 2px 2px; }
+  .cm-back { font-size: 12px; color: #bbb; }
+  /* 换座提示 */
+  .seat-hint {
+    text-align: center; font-size: 12px; color: #c0a878; margin-top: 2px;
+  }
+  /* 板前名牌（座位编号） */
+  /* 座位下方的荣誉称号徽章 */
+  .seat-badge {
+    position: absolute; top: 102px; left: 50%; transform: translateX(-50%);
+    font-size: 11px; font-weight: bold; padding: 3px 10px; border-radius: 12px;
+    white-space: nowrap; z-index: 5; margin-top: 4px;
+    animation: badgePop .5s cubic-bezier(.2, 1.6, .4, 1);
+  }
+  @keyframes badgePop {
+    from { transform: translateX(-50%) scale(.5); opacity: 0; }
+    to { transform: translateX(-50%) scale(1); opacity: 1; }
+  }
+  /* 低卡王：半透明浅绿 */
+  .badge-lowcal {
+    background: rgba(174, 220, 192, .55); color: #2f7a4c;
+    border: 1px solid rgba(120, 200, 150, .5);
+  }
+  /* 大胃王：半透明金黄 */
+  .badge-big {
+    background: rgba(255, 205, 90, .5); color: #a07508;
+    border: 1px solid rgba(230, 180, 60, .55);
+  }
+  /* 食物堆弹出的明细气泡 */
+  .pile-pop {
+    position: absolute; bottom: 190px; left: 50%; transform: translateX(-50%);
+    background: #fff; border: 1px solid #f0e2c8; border-radius: 12px;
+    padding: 8px 12px; font-size: 12px; color: #555; white-space: nowrap;
+    box-shadow: 0 6px 16px rgba(0,0,0,.12); z-index: 9;
+    animation: pop .2s ease; line-height: 1.8;
+  }
+  .pile-pop::after {
+    content: ""; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+    border: 6px solid transparent; border-top-color: #fff;
+  }
+  .table-empty {
+    text-align: center; color: #bbb; font-size: 13px; padding: 20px 0 10px;
+  }
+  .diner-list { margin-top: 14px; }
+  .diner-item {
+    padding: 10px 0; border-bottom: 1px dashed #f0f0f0; font-size: 13px;
+  }
+  .diner-item .d-head { display: flex; justify-content: space-between; margin-bottom: 4px; }
+  .diner-item .d-name { font-weight: bold; color: #43825c; }
+  .diner-item .d-kcal { color: #ff9a55; }
+  .diner-item .d-foods { color: #888; line-height: 1.7; }
+
+  /* 弹窗 */
+  .modal-mask {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4);
+    justify-content: center; align-items: center; z-index: 99;
+  }
+  .modal-mask.show { display: flex; }
+  .modal {
+    background: #fff; border-radius: 18px; padding: 30px 40px 24px; text-align: center;
+    animation: pop .25s ease;
+  }
+  @keyframes pop { from { transform: scale(.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .modal .m-emoji { font-size: 60px; }
+  .modal .m-name { font-size: 22px; font-weight: bold; margin: 10px 0 4px; color: #333; }
+  .modal .m-kcal { color: #ff9a55; margin-bottom: 16px; font-size: 14px; }
+  .modal .btn { margin: 0 5px; }
+  /* 抽卡弹窗加大 */
+  .gacha-modal { padding: 40px 60px 32px; min-width: 520px; }
+  .btn-again { background: #fff; color: #ff9a55; border: 1px solid #ffcfad; }
+  .btn-add2 { background: #ffab73; color: #fff; }
+  .btn-close { background: #f5f5f5; color: #999; }
+  .cloche-stage {
+    position: relative; width: 380px; height: 360px; margin: -14px auto 4px;
+    cursor: pointer;
+  }
+  /* 食物结果（藏在盖子下，开盖瞬间与光圈同时冲出） */
+  .cloche-food {
+    position: absolute; left: 50%; bottom: 78px; transform: translateX(-50%);
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    opacity: 0; z-index: 3;
+  }
+  .cloche-stage.open .cloche-food { opacity: 1; transition: opacity .12s .12s; }
+  .cloche-food .cf-emoji {
+    font-size: 96px; line-height: 1;
+    filter: drop-shadow(0 8px 18px rgba(0,0,0,.18));
+  }
+  .cloche-stage.open .cloche-food .cf-emoji {
+    animation: foodRise .7s cubic-bezier(.2, 1.8, .35, 1) .1s both;
+  }
+  @keyframes foodRise {
+    0% { transform: translateY(46px) scale(.25) rotate(-10deg); }
+    60% { transform: translateY(-14px) scale(1.12) rotate(3deg); }
+    100% { transform: translateY(0) scale(1) rotate(0); }
+  }
+  .cloche-food .cf-name {
+    font-size: 26px; font-weight: bold; color: #333; white-space: nowrap;
+    letter-spacing: 1px;
+  }
+  .cloche-stage.open .cloche-food .cf-name { animation: fadeInUp .45s ease .5s both; }
+  .cloche-food .cf-kcal {
+    font-size: 15px; color: #ff9a55; white-space: nowrap;
+  }
+  .cloche-stage.open .cloche-food .cf-kcal { animation: fadeInUp .45s ease .62s both; }
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  /* 碟子（更大更有光泽） */
+  .cloche-plate {
+    position: absolute; left: 50%; bottom: 48px; transform: translateX(-50%);
+    width: 270px; height: 50px;
+  }
+  .cloche-plate::before {  /* 碟面 */
+    content: ""; position: absolute; inset: 0;
+    background: radial-gradient(ellipse at 50% 38%, #ffffff, #eef1f5 70%, #dde3ea);
+    border-radius: 50%;
+    box-shadow: 0 10px 22px rgba(0,0,0,.16);
+  }
+  .cloche-plate::after {   /* 碟子内圈 */
+    content: ""; position: absolute; left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    width: 180px; height: 26px; border-radius: 50%;
+    background: radial-gradient(ellipse at 50% 40%, #f4f6f9, #e2e7ee);
+  }
+  /* 餐盖（穹顶，更大） */
+  .cloche-dome {
+    position: absolute; left: 50%; bottom: 66px;
+    width: 244px; height: 146px;
+    transform: translateX(-50%);
+    transform-origin: 85% 100%;
+    transition: transform .75s cubic-bezier(.5, -.35, .3, 1) .05s, opacity .5s .2s;
+    z-index: 4;
+  }
+  .cloche-dome::before {   /* 穹顶本体 */
+    content: ""; position: absolute; inset: 0 0 8px;
+    border-radius: 130px 130px 12px 12px;
+    background: linear-gradient(115deg, #fdfdfe 20%, #d9dee6 60%, #c3cad5);
+    box-shadow: inset -18px -10px 28px rgba(120, 135, 155, .3),
+                inset 16px 12px 26px rgba(255,255,255,.95),
+                0 12px 24px rgba(0,0,0,.14);
+  }
+  .cloche-dome::after {    /* 穹顶高光 */
+    content: ""; position: absolute; left: 24px; top: 16px;
+    width: 82px; height: 46px; border-radius: 50%;
+    background: linear-gradient(115deg, rgba(255,255,255,.95), transparent 70%);
+    transform: rotate(-16deg);
+  }
+  .dome-knob {             /* 盖子把手 */
+    position: absolute; left: 50%; top: -18px; transform: translateX(-50%);
+    width: 34px; height: 34px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #ffffff, #cdd3dc 65%, #aab2bf);
+    box-shadow: 0 4px 8px rgba(0,0,0,.22), inset 0 -2px 5px rgba(120,135,155,.35);
+    z-index: 5;
+  }
+  /* 打开时：盖子掀起飞走 */
+  .cloche-stage.open .cloche-dome {
+    transform: translateX(-50%) rotate(42deg) translate(110px, -170px) scale(.88);
+    opacity: 0;
+  }
+  /* 未打开时的呼吸提示 */
+  .cloche-stage:not(.open) .cloche-dome { animation: domeIdle 2s ease-in-out infinite; }
+  @keyframes domeIdle {
+    0%, 100% { transform: translateX(-50%) translateY(0); }
+    50% { transform: translateX(-50%) translateY(-8px); }
+  }
+  /* 开盖爆发光圈（颜色随热量档位，位于食物后方） */
+  .cloche-glow {
+    position: absolute; left: 50%; bottom: 36px; transform: translateX(-50%);
+    width: 330px; height: 250px; border-radius: 50%;
+    opacity: 0; pointer-events: none; z-index: 2;
+  }
+  .cloche-stage.open .cloche-glow { animation: glowBurst 1.2s ease-out .1s both; }
+  @keyframes glowBurst {
+    0% { opacity: 0; transform: translateX(-50%) scale(.3); }
+    25% { opacity: 1; }
+    100% { opacity: .6; transform: translateX(-50%) scale(1.15); }
+  }
+  /* 三档光效：低卡绿 / 中卡金 / 高卡红 */
+  .glow-low  { background: radial-gradient(ellipse at 50% 58%, rgba(120, 220, 150, .9), rgba(120, 220, 150, .28) 55%, transparent 72%); }
+  .glow-mid  { background: radial-gradient(ellipse at 50% 58%, rgba(255, 205, 90, .95), rgba(255, 205, 90, .32) 55%, transparent 72%); }
+  .glow-high { background: radial-gradient(ellipse at 50% 58%, rgba(255, 110, 90, .95), rgba(255, 110, 90, .32) 55%, transparent 72%); }
+  /* 开盖放射光线条（食物后方） */
+  .cloche-rays {
+    position: absolute; left: 50%; bottom: 80px; transform: translateX(-50%);
+    width: 350px; height: 285px; opacity: 0; pointer-events: none; z-index: 2;
+  }
+  .cloche-stage.open .cloche-rays { animation: raysSpin .9s ease-out .12s both; }
+  .cloche-rays span {
+    position: absolute; left: 50%; bottom: 0; width: 6px; height: 50%;
+    transform-origin: 50% 100%; border-radius: 3px;
+  }
+  .rays-low span  { background: linear-gradient(to top, rgba(120,220,150,.95), transparent); }
+  .rays-mid span  { background: linear-gradient(to top, rgba(255,205,90,.95), transparent); }
+  .rays-high span { background: linear-gradient(to top, rgba(255,110,90,.95), transparent); }
+  @keyframes raysSpin {
+    0% { opacity: 0; transform: translateX(-50%) scale(.25) rotate(-16deg); }
+    30% { opacity: 1; }
+    100% { opacity: 0; transform: translateX(-50%) scale(1.2) rotate(8deg); }
+  }
+  /* 热量档位标签 */
+  .kcal-tier {
+    display: inline-block; margin-top: 4px; padding: 4px 18px;
+    border-radius: 14px; font-size: 14px; font-weight: bold;
+  }
+  .cloche-stage.open .kcal-tier { animation: fadeInUp .45s ease .74s both; }
+  .tier-low  { background: #ddf3e4; color: #3f9c62; }
+  .tier-mid  { background: #fdeec4; color: #b8912a; }
+  .tier-high { background: #fde0da; color: #c8553f; }
+  .cloche-hint {
+    text-align: center; font-size: 14px; color: #aaa; margin: 2px 0 16px;
+    animation: hintPulse 1.6s ease-in-out infinite;
+  }
+  @keyframes hintPulse { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
+
+  /* toast */
+  .toast {
+    position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%) translateY(20px);
+    background: #333; color: #fff; padding: 10px 22px; border-radius: 24px;
+    font-size: 13px; opacity: 0; transition: .3s; pointer-events: none; z-index: 100;
+  }
+  .toast.show { opacity: .92; transform: translateX(-50%) translateY(0); }
+
+  /* ===== 随机页：模式选择 ===== */
+  .gacha-modes {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px; margin-top: 18px;
+  }
+  .gacha-mode-card {
+    border-radius: 18px; padding: 24px 20px; cursor: pointer; border: none;
+    text-align: left; transition: .2s; font-family: inherit;
+    display: flex; flex-direction: column; gap: 8px; min-height: 130px;
+  }
+  .gacha-mode-card:hover { transform: translateY(-4px); box-shadow: 0 10px 24px rgba(0,0,0,.08); }
+
+  /* ===== Omakase 舞台（随机页内嵌小吧台，与小饭桌场景互不影响） ===== */
+  .oma-stage { margin-top: 18px; }
+  .oma-scene {
+    position: relative; width: 560px; max-width: 96%; height: 300px; margin: 0 auto;
+    border-radius: 18px; overflow: hidden;
+    border: 1px solid #ecdcc0;
+  }
+  /* 二次元日式餐厅背景：SVG 绘制，铺满场景 */
+  .oma-bg {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    z-index: 0; pointer-events: none;
+  }
+  /* 小吧台：78px 高、310px 宽，中间偏右 50px，挡住厨师最下面一点 */
+  .oma-bar {
+    position: absolute; left: calc(50% + 50px); bottom: 13px; transform: translateX(-50%);
+    width: 310px; height: 78px; z-index: 4;
+  }
+  /* 台面：樱桃木压边条，带釉光 */
+  .oma-bar .ob-top {
+    height: 10px; border-radius: 6px 6px 2px 2px;
+    background:
+      linear-gradient(to bottom, rgba(255,255,255,.5) 0 2px, transparent 3px),
+      linear-gradient(to bottom, #c96f4a, #a85334 60%, #8a422a);
+    box-shadow: 0 2px 4px rgba(120, 60, 30, .35);
+    position: relative; z-index: 2;
+  }
+  /* 立面：深色胡桃木，无规则纹理，靠光影做质感 */
+  .oma-bar .ob-front {
+    margin: 0 3px; height: 70px;
+    border-radius: 0 0 8px 8px;
+    background:
+      radial-gradient(ellipse 130% 60% at 50% -12%, rgba(255, 214, 160, .28), transparent 60%),
+      linear-gradient(105deg, rgba(255,255,255,.09) 0 12%, transparent 26% 78%, rgba(0,0,0,.1) 92%),
+      linear-gradient(to bottom, #7a5230, #5f3f24 55%, #4c311c);
+    border: 2px solid #3f2917; border-top: none;
+    box-shadow: inset 0 5px 8px -5px rgba(0, 0, 0, .5),
+                inset 0 -10px 16px -10px rgba(0, 0, 0, .55),
+                0 4px 10px rgba(90, 58, 24, .3);
+    position: relative; z-index: 1;
+  }
+  /* 厨师：站在吧台后方，最下面一点被台面挡住（不穿模） */
+  .oma-chef {
+    position: absolute; left: 50%; bottom: 65px; transform: translateX(-50%);
+    z-index: 3; cursor: pointer; transition: transform .2s;
+  }
+  .oma-chef:hover { transform: translateX(-50%) scale(1.04); }
+  .oma-chef .chef-svg { width: 118px; }
+  /* 空闲时的缓慢搅拌（比小饭桌稍慢），忙碌时加速 */
+  .oma-chef .arm-stir { animation-duration: 2.4s; }
+  .oma-chef .arm-stir-l { animation-duration: 3.2s; }
+  .oma-chef.busy .chef-svg { animation: omaBusy .38s ease-in-out infinite; }
+  .oma-chef.busy .arm-stir { animation-duration: .32s; }
+  .oma-chef.busy .arm-stir-l { animation-duration: .5s; }
+  @keyframes omaBusy {
+    0%, 100% { transform: translateY(0) rotate(-1.5deg); }
+    30% { transform: translateY(-5px) rotate(1.5deg); }
+    60% { transform: translateY(-2px) rotate(-1deg); }
+  }
+  /* 忙碌时的锅边香气：白色波浪缓缓上升（默认隐藏） */
+  .oma-sweat {
+    position: absolute; left: 56%; top: 34%; transform: translateX(-50%);
+    width: 70px; display: none; justify-content: space-between;
+    z-index: 6; pointer-events: none;
+  }
+  .oma-sweat i {
+    width: 6px; height: 22px; border-radius: 50%;
+    border: 2px solid transparent; border-left-color: rgba(255, 255, 255, .9);
+    opacity: 0; transform: rotate(12deg);
+    animation: omaSteam 1.1s ease-in-out infinite;
+    filter: blur(.4px);
+  }
+  .oma-sweat i:nth-child(2) { animation-delay: .2s; height: 27px; }
+  .oma-sweat i:nth-child(3) { animation-delay: .4s; }
+  .oma-sweat i:nth-child(4) { animation-delay: .6s; height: 25px; }
+  .oma-sweat i:nth-child(5) { animation-delay: .8s; }
+  @keyframes omaSteam {
+    0%   { transform: translateY(6px) rotate(4deg) scale(.8); opacity: 0; }
+    35%  { opacity: .8; }
+    70%  { transform: translateY(-9px) rotate(-8deg) scale(1); opacity: .5; }
+    100% { transform: translateY(-20px) rotate(10deg) scale(1.1); opacity: 0; }
+  }
+  /* 说话气泡 */
+  .oma-bubble {
+    position: absolute; left: 82%; top: 0;
+    background: #fff; border: 2px solid #e8d9be; border-radius: 12px;
+    padding: 5px 12px; font-size: 12px; color: #6b5a3e; white-space: nowrap;
+    box-shadow: 0 4px 10px rgba(0,0,0,.08);
+    opacity: 0; transform: translateY(4px) scale(.9); transform-origin: left bottom;
+    transition: opacity .2s, transform .2s; pointer-events: none; z-index: 4;
+  }
+  .oma-bubble.show { opacity: 1; transform: translateY(0) scale(1); }
+  .oma-bubble::before {
+    content: ""; position: absolute; left: -7px; bottom: 8px;
+    border: 4px solid transparent; border-right-color: #fff;
+    filter: drop-shadow(-2px 0 0 #e8d9be);
+  }
+  /* 菜品容器：摆在吧台台面上（跟随吧台右移） */
+  .oma-dishes {
+    position: absolute; left: 50px; right: -50px; bottom: 81px; height: 74px;
+    display: flex; align-items: flex-end; justify-content: center; gap: 12px;
+    z-index: 5; pointer-events: none;
+  }
+  /* 吧台上的白瓷瓶：细长观音瓶 + 一支兰花，离吧台右边 8px，坐在台面上 */
+  .oma-vase {
+    position: absolute; right: 14px; bottom: 100%;
+    width: 20px; height: 54px; z-index: 6;
+  }
+  /* 白瓷瓶身：细长观音瓶（细颈、溜肩、微收腹） */
+  .oma-vase .vase-body {
+    position: absolute; left: 50%; bottom: 0; transform: translateX(-50%);
+    width: 13px; height: 26px;
+    background:
+      linear-gradient(105deg, rgba(180, 200, 220, .4) 0 22%, transparent 40%),
+      radial-gradient(ellipse at 34% 22%, #ffffff, #f2f5f8 55%, #d8e0e8);
+    border-radius: 44% 44% 48% 48% / 34% 34% 56% 56%;
+    box-shadow: inset -2px -3px 4px rgba(140, 160, 180, .3), 0 2px 3px rgba(0,0,0,.16);
+  }
+  .oma-vase .vase-body::before {   /* 细颈 */
+    content: ""; position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%);
+    width: 5px; height: 9px; margin-bottom: -2px;
+    background: linear-gradient(to right, #e2e9ef, #ffffff 45%, #d4dde5);
+    border-radius: 2px 2px 40% 40%;
+  }
+  .oma-vase .vase-body::after {    /* 瓶口 */
+    content: ""; position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%);
+    width: 7px; height: 3px; border-radius: 50%;
+    background: radial-gradient(ellipse at 50% 40%, #c2cdd8 0 45%, #edf1f5 70%);
+  }
+  /* 兰花：SVG 花茎 + 三朵小花 */
+  .oma-vase .orchid {
+    position: absolute; left: 50%; bottom: 30px; transform: translateX(-50%);
+    width: 26px; height: 24px; overflow: visible;
+  }
+  .oma-vase .orchid path.stem {
+    stroke: #6d9a5c; stroke-width: 1.4; fill: none; stroke-linecap: round;
+  }
+  .oma-vase .orchid path.leaf { fill: #6f9f5e; }
+  .oma-vase .bloom {
+    position: absolute; width: 9px; height: 9px; border-radius: 50%;
+    background:
+      radial-gradient(circle at 50% 22%, #f2b9cf 0 2.6px, transparent 3px),
+      radial-gradient(circle at 78% 40%, #f2b9cf 0 2.6px, transparent 3px),
+      radial-gradient(circle at 68% 76%, #f2b9cf 0 2.6px, transparent 3px),
+      radial-gradient(circle at 32% 76%, #f2b9cf 0 2.6px, transparent 3px),
+      radial-gradient(circle at 22% 40%, #f2b9cf 0 2.6px, transparent 3px),
+      radial-gradient(circle at 50% 52%, #d4698f 0 1.8px, transparent 2.2px);
+  }
+  .oma-vase .bloom.b1 { left: 60%; top: -4%; }
+  .oma-vase .bloom.b2 { left: 26%; top: 22%; transform: scale(.85); }
+  .oma-vase .bloom.b3 { left: 62%; top: 48%; transform: scale(.7); }
+  /* 单道菜：日式小碟 + 食物，依次弹出 */
+  .oma-dish {
+    display: flex; flex-direction: column; align-items: center; gap: 0;
+    opacity: 0; transform: translateY(-26px) scale(.4);
+    transition: transform .38s cubic-bezier(.2, 1.6, .4, 1), opacity .25s;
+    position: relative; pointer-events: auto; cursor: default;
+  }
+  .oma-dish.served { opacity: 1; transform: translateY(0) scale(1); }
+  .oma-dish .od-food {
+    font-size: 32px; line-height: 1; z-index: 2; margin-bottom: -7px;
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,.18));
+  }
+  /* 日式小碟：蓝白纹 */
+  .oma-dish .od-plate {
+    width: 60px; height: 18px; border-radius: 50%;
+    background: radial-gradient(ellipse at 50% 35%, #ffffff 0 45%, #dfe9f2 60%, #b9cfe4 78%, #7fa3c8 82%, #b9cfe4 88%, #dfe9f2 100%);
+    box-shadow: 0 4px 8px rgba(0,0,0,.16);
+    position: relative;
+  }
+  .oma-dish .od-plate::after {   /* 碟沿蓝圈 */
+    content: ""; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: 40px; height: 10px; border-radius: 50%;
+    border: 1.5px solid rgba(110, 150, 190, .55);
+  }
+  .oma-dish .od-name {
+    position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+    margin-top: 3px; font-size: 11px; color: #7a6440; white-space: nowrap;
+    background: rgba(255,255,255,.9); border: 1px solid #f0e2c8;
+    padding: 1px 7px; border-radius: 8px;
+  }
+  .oma-dish .od-kcal { color: #ff9a55; }
+  .oma-actions { margin-top: 30px; text-align: center; }
+  /* 菜品数量选择：1-4 道 */
+  .oma-count-row { margin-top: 26px; text-align: center; }
+  .oma-count-row .oc-label { display: block; font-size: 12px; color: #a8906a; margin-bottom: 6px; letter-spacing: 2px; }
+  .oma-count { display: inline-flex; gap: 6px; background: #fdf6ea; border: 1px solid #eeddbe; border-radius: 999px; padding: 4px; }
+  .oma-count .on-btn {
+    border: none; background: transparent; cursor: pointer;
+    font-size: 13px; color: #8a6f4d; padding: 5px 14px; border-radius: 999px;
+    transition: background .18s, color .18s, box-shadow .18s;
+  }
+  .oma-count .on-btn:hover { background: #f6e8cf; }
+  .oma-count .on-btn.active {
+    background: linear-gradient(to bottom, #ffab63, #ff8f3d); color: #fff;
+    box-shadow: 0 2px 6px rgba(255, 143, 61, .4);
+  }
+  .oma-total { font-size: 15px; font-weight: bold; color: #333; margin-bottom: 10px; }
+  .oma-total b { color: #ff9a55; }
+  .oma-btns { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+
+  /* Twemoji 图片 emoji：统一为扁平风（类苹果风格），与文字基线对齐 */
+  img.twemoji {
+    height: 1.1em; width: 1.1em; vertical-align: -0.15em;
+    margin: 0 .05em; display: inline-block;
+  }
+
+  @media (max-width: 800px) {
+    .container { flex-direction: column; }
+    .plate { width: 100%; position: static; }
+    .shop-rail { width: 100%; position: static; order: -1; }
+  }
+</style>
 </head>
 <body>
-  <p>正在跳转… <a href="吃什么.html">点这里进入</a></p>
+
+<!-- 背景装饰：漂浮的食物 emoji -->
+<div class="bg-deco">
+  <span style="top:8%;  left:4%;  font-size:44px; animation-delay:0s">🍔</span>
+  <span style="top:14%; right:6%;  font-size:38px; animation-delay:1.2s">🍟</span>
+  <span style="top:38%; left:2%;  font-size:32px; animation-delay:2s">🍦</span>
+  <span style="top:52%; right:3%; font-size:42px; animation-delay:.6s">🌶️</span>
+  <span style="top:72%; left:6%;  font-size:36px; animation-delay:1.6s">🧋</span>
+  <span style="top:82%; right:8%; font-size:34px; animation-delay:2.4s">🍜</span>
+  <span style="top:30%; left:44%; font-size:28px; animation-delay:3s">🍩</span>
+  <span style="top:66%; right:38%; font-size:30px; animation-delay:.3s">🍣</span>
+  <span style="top:88%; left:38%; font-size:32px; animation-delay:1.9s">🥟</span>
+</div>
+
+<header>
+  <button class="back-btn" id="backBtn" onclick="goHome()">← 返回首页</button>
+  <h1 id="pageTitle">🍚 今天吃什么</h1>
+  <div class="user-box">
+    <div class="u-avatar" id="uAvatar" title="编辑资料" onclick="openUserEdit()">U</div>
+    <select id="userSelect" onchange="onUserChange(this.value)"></select>
+    <button class="u-edit" title="编辑资料" onclick="openUserEdit()">✏️</button>
+  </div>
+</header>
+
+<!-- 用户资料编辑弹窗 -->
+<div class="modal-mask" id="userModalMask" onclick="if(event.target===this)hideUserEdit()">
+  <div class="modal user-modal">
+    <div class="um-title">👤 我的资料</div>
+    <div class="um-avatar" id="umAvatar">U</div>
+    <input type="file" id="umFile" accept="image/*" style="display:none">
+    <button class="btn btn-again" onclick="document.getElementById('umFile').click()">📷 上传头像</button>
+    <div class="um-field">
+      <label>用户 ID</label>
+      <input type="text" id="umName" maxlength="12" placeholder="输入你的 ID">
+    </div>
+    <div class="um-actions">
+      <button class="btn btn-add2" onclick="saveUserEdit()">保存</button>
+      <button class="btn btn-close" onclick="hideUserEdit()">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 主界面 ================= -->
+<div class="view active" id="viewHome">
+  <div class="home-wrap">
+    <div class="home-hello">
+      <h2>今天想吃点什么？</h2>
+      <p>选餐 · 记录 · 健康管理，一站搞定</p>
+    </div>
+    <div class="home-grid">
+      <button class="home-card hc-orange" onclick="goView('food')">
+        <span class="hc-emoji">🍽️</span>
+        <span class="hc-title">今天吃什么</span>
+        <span class="hc-desc">湘菜、中餐、轻食……挑选美食加入餐盘，自动算热量，还能随机帮你选</span>
+      </button>
+      <button class="home-card hc-blue" onclick="goView('history')">
+        <span class="hc-emoji">📖</span>
+        <span class="hc-title">进食记录</span>
+        <span class="hc-desc">每一餐都记下来，看看今天、最近都吃了什么、摄入多少热量</span>
+      </button>
+      <button class="home-card hc-purple" onclick="goView('bmi')">
+        <span class="hc-emoji">⚖️</span>
+        <span class="hc-title">BMI 计算器</span>
+        <span class="hc-desc">输入身高体重，算算 BMI 指数，了解自己的身体状态和热量建议</span>
+      </button>
+      <button class="home-card hc-pink" onclick="goView('gacha')">
+        <span class="hc-emoji">🎲</span>
+        <span class="hc-title">随机来一道</span>
+        <span class="hc-desc">选择困难症救星：抽卡单点，或交给大厨安排 Omakase 套餐</span>
+      </button>
+      <button class="home-card hc-yellow" onclick="goView('bin')">
+        <span class="hc-emoji">🗑️</span>
+        <span class="hc-title">厨余垃圾</span>
+        <span class="hc-desc">拒吃（拉黑）的食物都躺在这里，反悔了可以随时恢复</span>
+      </button>
+      <button class="home-card hc-green" onclick="goView('table')">
+        <span class="hc-emoji">🍽️</span>
+        <span class="hc-title">小饭桌</span>
+        <span class="hc-desc">看看今天大家都吃了什么，一起吃饭的小伙伴都坐在桌边</span>
+      </button>
+    </div>
+    <div class="home-stat hc-green-bg">
+      <span class="s-label">🔥 今日已摄入热量</span>
+      <span class="s-value" id="homeTodayKcal">0 kcal</span>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 选餐页 ================= -->
+<div class="view" id="viewFood">
+  <div class="container">
+    <!-- 最左侧：店铺筛选 -->
+    <div class="shop-rail">
+      <div class="shop-card">
+        <div class="shop-card-title">🏪 逛逛店铺</div>
+        <div id="shopList"></div>
+      </div>
+    </div>
+
+    <div class="main">
+      <div class="toolbar">
+        <input type="text" id="searchInput" placeholder="🔍 搜索想吃的… 比如：鸡、面、沙拉">
+        <button class="btn btn-lucky" onclick="luckyDraw()">🎲 帮我随机选</button>
+      </div>
+
+      <!-- 菜品区 -->
+      <div class="shop-layout">
+        <div class="shop-menu">
+          <!-- 自定义食物 -->
+          <div class="custom-panel">
+            <div class="custom-title" onclick="toggleCustom()">
+              ✏️ 没找到想吃的？自定义添加 <span id="customArrow">▾</span>
+            </div>
+            <div class="custom-body" id="customBody">
+              <div class="custom-row">
+                <input type="text" id="customName" placeholder="输入菜名，如：剁椒鱼头">
+                <button class="btn btn-lucky" onclick="lookupKcal()">🔍 查热量</button>
+              </div>
+              <div class="custom-result" id="customResult" style="display:none">
+                <span id="customSuggest"></span>
+                <input type="number" id="customKcal" min="0" max="3000" placeholder="kcal">
+                <button class="btn btn-add2" onclick="addCustom()">＋ 加入餐盘</button>
+              </div>
+              <div class="custom-tip" id="customTip">内置常见菜品热量数据库，自动匹配估算；查不到可手动填写热量。</div>
+            </div>
+          </div>
+
+          <div class="grid" id="foodGrid"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="plate">
+      <h2>🍽️ 我的餐盘</h2>
+      <div class="meal-switch">
+        <button class="meal-btn active" data-meal="lunch" onclick="switchMeal('lunch')">🌞 午饭</button>
+        <button class="meal-btn" data-meal="dinner" onclick="switchMeal('dinner')">🌙 晚饭</button>
+      </div>
+      <div class="plate-items" id="plateItems"></div>
+      <div class="plate-total">
+        <span>总热量</span>
+        <span id="totalKcal">0 kcal</span>
+      </div>
+      <div class="plate-advice" id="advice">还是空的，快去加点好吃的吧～</div>
+      <div class="plate-actions">
+        <button class="btn-record" onclick="recordMeal()">✔️ 吃完了，记一笔</button>
+        <button class="btn-clear" onclick="clearPlate()">清空</button>
+      </div>
+
+      <!-- 猜你喜欢 / 常吃（餐盘下方，固定4个） -->
+      <div class="plate-qs">
+        <div class="plate-qs-title">💖 猜你喜欢</div>
+        <div class="rail-chips" id="guessList"></div>
+      </div>
+      <div class="plate-qs">
+        <div class="plate-qs-title">🍚 你常吃</div>
+        <div class="rail-chips" id="oftenList"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 进食记录页 ================= -->
+<div class="view" id="viewHistory">
+  <div class="page-wrap">
+    <div class="panel">
+      <div class="panel-head">
+        <h2>📖 进食记录</h2>
+        <span class="today-stat" id="todayStat"></span>
+        <button class="btn-clear-history" onclick="clearHistory()">清空全部记录</button>
+      </div>
+      <div class="history-list" id="historyList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 厨余垃圾页 ================= -->
+<div class="view" id="viewBin">
+  <div class="page-wrap">
+    <div class="panel">
+      <div class="panel-head">
+        <h2>🗑️ 厨余垃圾</h2>
+        <span class="today-stat" id="binStat"></span>
+        <button class="btn-clear-history" onclick="restoreAll()">全部恢复</button>
+      </div>
+      <div class="history-list" id="binList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 小饭桌页 ================= -->
+<div class="view" id="viewTable">
+  <div class="page-wrap">
+    <div class="panel">
+      <div class="panel-head">
+        <h2>🍽️ 今日小饭桌</h2>
+        <span class="today-stat" id="tableStat"></span>
+      </div>
+      <div class="table-scene" id="tableScene">
+        <!-- 餐厅背景：木墙 + 暖帘 + 吊灯 + 菜单牌 -->
+        <div class="restaurant-bg">
+          <div class="bg-lamps">
+            <div class="lamp"><i></i></div>
+            <div class="lamp"><i></i></div>
+            <div class="lamp"><i></i></div>
+          </div>
+          <div class="bg-noren">
+            <span>お</span><span>食</span><span>事</span>
+          </div>
+          <!-- 右侧墙上的简约风景海报：樱花富士 -->
+          <div class="bg-poster">
+            <div class="poster-sky"></div>
+            <div class="poster-sun"></div>
+            <div class="poster-mt-back"></div>
+            <div class="poster-mt"></div>
+            <div class="poster-sakura"></div>
+            <div class="poster-petal p1"></div>
+            <div class="poster-petal p2"></div>
+            <div class="poster-petal p3"></div>
+            <div class="poster-ground"></div>
+            <div class="poster-bird b1"></div>
+            <div class="poster-bird b2"></div>
+          </div>
+          <div class="bg-menu-board" id="menuBoard">
+            <div class="bmb-title">本日推荐</div>
+            <div class="bmb-line">准备中…</div>
+          </div>
+          <div class="bg-tools">
+            <!-- 锅铲 -->
+            <div class="tool">
+              <svg width="20" height="52" viewBox="0 0 20 52">
+                <rect x="8" y="0" width="4" height="26" rx="2" fill="#b08c5a"/>
+                <rect x="3" y="26" width="14" height="24" rx="5" fill="#d8b184" stroke="#b08c5a" stroke-width="1.6"/>
+              </svg>
+            </div>
+            <!-- 汤勺 -->
+            <div class="tool">
+              <svg width="18" height="52" viewBox="0 0 18 52">
+                <rect x="7" y="0" width="4" height="28" rx="2" fill="#b08c5a"/>
+                <ellipse cx="9" cy="40" rx="8" ry="11" fill="#e8e2d6" stroke="#b0a68e" stroke-width="1.6"/>
+                <ellipse cx="9" cy="39" rx="4.5" ry="7" fill="#d5cdbd"/>
+              </svg>
+            </div>
+            <!-- 小煎锅 -->
+            <div class="tool">
+              <svg width="30" height="50" viewBox="0 0 30 50">
+                <rect x="12" y="0" width="5" height="20" rx="2.5" fill="#8a8f9c"/>
+                <circle cx="14.5" cy="34" r="14" fill="#9aa0ad" stroke="#767b89" stroke-width="1.6"/>
+                <circle cx="14.5" cy="34" r="9" fill="#7e8492"/>
+              </svg>
+            </div>
+          </div>
+          <!-- 手绘风盆栽：粗描边 + 柔和色块 -->
+          <svg class="bg-plant" viewBox="0 0 56 72">
+            <!-- 叶子：三片圆润手绘叶 -->
+            <g fill="#8fbf7a" stroke="#5d8a4c" stroke-width="2.5" stroke-linejoin="round">
+              <path d="M28 34 C24 20 14 12 6 14 C8 26 16 34 28 34 Z"/>
+              <path d="M28 34 C32 18 42 10 50 13 C48 25 40 34 28 34 Z" fill="#7db267"/>
+              <path d="M28 36 C26 24 28 10 34 4 C40 12 38 28 28 36 Z" fill="#9ccc85"/>
+            </g>
+            <!-- 茎 -->
+            <path d="M28 36 L28 46" stroke="#5d8a4c" stroke-width="2.5" stroke-linecap="round"/>
+            <!-- 花盆：陶土色梯形 + 盆沿 -->
+            <path d="M15 46 h26 l-4 22 a4 4 0 0 1 -4 3 h-10 a4 4 0 0 1 -4 -3 z"
+                  fill="#e0a37e" stroke="#b87a56" stroke-width="2.5" stroke-linejoin="round"/>
+            <rect x="12" y="42" width="32" height="8" rx="4"
+                  fill="#eab493" stroke="#b87a56" stroke-width="2.5"/>
+            <!-- 盆身手绘高光（受光面在左上） -->
+            <path d="M35 52 q1.5 6 2 10" stroke="#f2c8ad" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <!-- 打瞌睡的小猫：miao.png，可提起，松手下落（放在背景层外，否则点不到） -->
+        <div class="bg-cat">
+          <img src="miao.png" alt="打瞌睡的小猫">
+        </div>
+        <div class="bar-counter"></div>
+        <div class="bar-front"></div>
+        <div class="steam"><i></i><i></i><i></i></div>
+        <!-- 站在桌子中间空洞里的厨师：三渲二简约风 -->
+        <div class="chef">
+          <svg class="chef-svg" viewBox="0 0 140 160">
+            <!-- 耳朵 -->
+            <circle cx="48" cy="62" r="4.5" fill="#ffd9b3"/>
+            <circle cx="92" cy="62" r="4.5" fill="#f0c49c"/>
+            <!-- 头 -->
+            <circle cx="70" cy="64" r="22" fill="#ffd9b3"/>
+            <path d="M70 42 a22 22 0 0 1 0 44 z" fill="#f0c49c"/>
+            <!-- 眉毛 -->
+            <rect x="56" y="56" width="9" height="3" rx="1.5" fill="#8a6a4f"/>
+            <rect x="75" y="56" width="9" height="3" rx="1.5" fill="#8a6a4f"/>
+            <!-- 眼睛（带高光） -->
+            <circle cx="60" cy="64" r="3" fill="#3a3a3a"/>
+            <circle cx="61" cy="63" r="1" fill="#ffffff"/>
+            <circle cx="80" cy="64" r="3" fill="#3a3a3a"/>
+            <circle cx="81" cy="63" r="1" fill="#ffffff"/>
+            <!-- 腮红 -->
+            <circle cx="52" cy="72" r="3.6" fill="#ffb3a7" opacity=".75"/>
+            <circle cx="88" cy="72" r="3.6" fill="#ffb3a7" opacity=".75"/>
+            <!-- 八字胡 -->
+            <ellipse cx="63" cy="75" rx="7" ry="3.8" fill="#ffffff"/>
+            <ellipse cx="77" cy="75" rx="7" ry="3.8" fill="#ececf2"/>
+            <!-- 微笑 -->
+            <path d="M65 82 q5 4 10 0" stroke="#c96a4a" stroke-width="2" fill="none" stroke-linecap="round"/>
+            <!-- 厨师帽：最后绘制，压在额头之上（云朵形帽顶 + 帽檐） -->
+            <path d="M48 47
+                     C44 39 42 33 43 26
+                     C44 15 52 8 60 8
+                     C63 3 70 1 75 4
+                     C83 2 92 8 94 18
+                     C99 20 101 26 100 32
+                     C99 40 96 45 92 47
+                     Z" fill="#ffffff"/>
+            <path d="M75 4
+                     C83 2 92 8 94 18
+                     C99 20 101 26 100 32
+                     C99 40 96 45 92 47
+                     L75 47 Z" fill="#ececf4"/>
+            <ellipse cx="60" cy="16" rx="9" ry="5.5" fill="#ffffff" opacity=".9"/>
+            <path d="M56 23 q-2 10 0 20" stroke="#d8d8e4" stroke-width="2" fill="none" stroke-linecap="round"/>
+            <path d="M70 19 q-2.5 12 0 24" stroke="#d8d8e4" stroke-width="2" fill="none" stroke-linecap="round"/>
+            <path d="M85 23 q2 10 0 20" stroke="#c9c9d8" stroke-width="2" fill="none" stroke-linecap="round"/>
+            <rect x="46" y="39" width="48" height="12" rx="6" fill="#ffffff"/>
+            <path d="M70 39 h18 a6 6 0 0 1 6 6 a6 6 0 0 1 -6 6 h-18 z" fill="#ececf4"/>
+            <line x1="52" y1="47" x2="88" y2="47" stroke="#dcdce6" stroke-width="1.3" stroke-dasharray="3 3"/>
+            <!-- 身体（厨师服） -->
+            <rect x="42" y="84" width="56" height="46" rx="16" fill="#ffffff"/>
+            <path d="M70 84 h12 a16 16 0 0 1 16 16 v14 a16 16 0 0 1 -16 16 h-12 z" fill="#ececf2"/>
+            <!-- 红领巾 -->
+            <path d="M60 86 h20 l-10 12 z" fill="#e2574c"/>
+            <!-- 双排扣 -->
+            <circle cx="63" cy="106" r="1.9" fill="#c9c9d6"/>
+            <circle cx="63" cy="116" r="1.9" fill="#c9c9d6"/>
+            <circle cx="77" cy="106" r="1.9" fill="#b9b9c8"/>
+            <circle cx="77" cy="116" r="1.9" fill="#b9b9c8"/>
+            <!-- 左手臂：举着一条手巾（呼应"出餐服务"） -->
+            <rect x="24" y="88" width="15" height="22" rx="7.5" fill="#ffffff" transform="rotate(38 31 92)"/>
+            <circle cx="22" cy="105" r="6" fill="#ffd9b3"/>
+            <!-- 搭在手上的小手巾 -->
+            <g class="arm-stir-l">
+              <rect x="10" y="98" width="22" height="16" rx="4" fill="#e8f4fb"/>
+              <path d="M10 106 h22 M16 98 v16 M24 98 v16" stroke="#c4deee" stroke-width="1.4"/>
+            </g>
+            <!-- 右手臂 + 锅铲（搅拌动画） -->
+            <g class="arm-stir">
+              <rect x="96" y="90" width="26" height="14" rx="7" fill="#ffffff"/>
+              <rect x="96" y="90" width="13" height="14" rx="7" fill="#ececf2"/>
+              <circle cx="121" cy="97" r="6.5" fill="#ffd9b3"/>
+              <rect x="116" y="97" width="5" height="24" rx="2.5" fill="#c98d5e" transform="rotate(14 118 99)"/>
+            </g>
+            <!-- 锅 -->
+            <rect x="98" y="116" width="38" height="24" rx="10" fill="#8a8f9c"/>
+            <path d="M98 126 a10 10 0 0 1 10 -10 v24 a10 10 0 0 1 -10 -10 z" fill="#767b89"/>
+            <ellipse cx="117" cy="117" rx="17" ry="5" fill="#ffd98a"/>
+            <ellipse cx="117" cy="117" rx="11" ry="3" fill="#ffc95e"/>
+          </svg>
+          <div class="chef-bubble" id="chefBubble"></div>
+        </div>
+      </div>
+      <div id="tableEmpty" class="table-empty" style="display:none">今天还没有人开饭，去「选餐」记一笔吧～</div>
+      <div class="seat-hint" id="seatHint" style="display:none">💺 点两个座位就能互换位置，像坐在板前一样挑个喜欢的位子</div>
+      <div class="diner-list" id="dinerList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= BMI 页 ================= -->
+<!-- ================= 随机页：模式选择 + Omakase 舞台 ================= -->
+<div class="view" id="viewGacha">
+  <div class="page-wrap">
+    <div class="panel">
+      <div class="panel-head"><h2>🎲 随机来一道</h2></div>
+      <!-- 模式选择 -->
+      <div class="gacha-modes" id="gachaModes">
+        <button class="gacha-mode-card hc-orange" onclick="gachaPick('card')">
+          <span class="hc-emoji">🃏</span>
+          <span class="hc-title">抽卡模式</span>
+          <span class="hc-desc">掀开餐盖，单点一道，交给运气决定</span>
+        </button>
+        <button class="gacha-mode-card hc-green" onclick="gachaPick('omakase')">
+          <span class="hc-emoji">👨‍🍳</span>
+          <span class="hc-title">Omakase 套餐</span>
+          <span class="hc-desc">大厨看着办！1-4 道随心选，直接上桌</span>
+        </button>
+      </div>
+      <!-- Omakase 舞台：小吧台 + 厨师 -->
+      <div class="oma-stage" id="omaStage" style="display:none">
+        <div class="oma-scene" id="omaScene">
+          <!-- 二次元日式餐厅背景 -->
+          <svg class="oma-bg" viewBox="0 0 560 300" preserveAspectRatio="xMidYMid slice">
+            <defs>
+              <linearGradient id="owaWall" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#fdf6e8"/><stop offset="1" stop-color="#f7e8cf"/>
+              </linearGradient>
+              <linearGradient id="owaSky" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#ffe9c4"/><stop offset=".6" stop-color="#ffd9b0"/><stop offset="1" stop-color="#f8c8a8"/>
+              </linearGradient>
+              <linearGradient id="owaFloor" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#d3a468"/><stop offset="1" stop-color="#b3854c"/>
+              </linearGradient>
+              <linearGradient id="owaBeam" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#a87c48"/><stop offset="1" stop-color="#8a6236"/>
+              </linearGradient>
+              <linearGradient id="owaNoren" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#84a2c0"/><stop offset="1" stop-color="#6e8db0"/>
+              </linearGradient>
+              <radialGradient id="owaLampGlow" cx=".5" cy=".4" r=".6">
+                <stop offset="0" stop-color="#ffd98a" stop-opacity=".8"/><stop offset="1" stop-color="#ffd98a" stop-opacity="0"/>
+              </radialGradient>
+            </defs>
+
+            <!-- 墙面 + 地板 -->
+            <rect width="560" height="252" fill="url(#owaWall)"/>
+            <rect y="252" width="560" height="48" fill="url(#owaFloor)"/>
+            <!-- 地板缝 -->
+            <g stroke="#9a7040" stroke-width="1.2" opacity=".5">
+              <line x1="60" y1="252" x2="30" y2="300"/><line x1="160" y1="252" x2="140" y2="300"/>
+              <line x1="280" y1="252" x2="280" y2="300"/><line x1="400" y1="252" x2="420" y2="300"/>
+              <line x1="500" y1="252" x2="530" y2="300"/>
+            </g>
+            <rect y="250" width="560" height="4" fill="#c8a06a"/>
+
+            <!-- 木梁柱框架 -->
+            <rect width="560" height="14" fill="url(#owaBeam)"/>
+            <rect x="176" y="0" width="10" height="252" fill="url(#owaBeam)"/>
+            <rect x="374" y="0" width="10" height="252" fill="url(#owaBeam)"/>
+            <rect y="14" width="560" height="3" fill="#7a5630" opacity=".6"/>
+
+            <!-- 障子窗（左开间）：黄昏天空 + 远山 + 樱花枝 -->
+            <g>
+              <rect x="14" y="30" width="148" height="176" rx="4" fill="#b98d58"/>
+              <rect x="20" y="36" width="136" height="164" fill="url(#owaSky)"/>
+              <!-- 远山 -->
+              <path d="M20 168 L66 108 L96 152 L120 122 L156 172 L156 200 L20 200 Z" fill="#9d8fb8" opacity=".8"/>
+              <path d="M20 182 L56 138 L84 176 L112 148 L156 188 L156 200 L20 200 Z" fill="#7a6d9e" opacity=".85"/>
+              <!-- 落日 -->
+              <circle cx="120" cy="76" r="15" fill="#ffb56b"/>
+              <circle cx="120" cy="76" r="20" fill="#ffb56b" opacity=".3"/>
+              <!-- 樱花枝探入 -->
+              <path d="M20 60 Q48 52 66 62" stroke="#7a5636" stroke-width="3" fill="none" stroke-linecap="round"/>
+              <g fill="#f4b8c8">
+                <circle cx="46" cy="52" r="5"/><circle cx="58" cy="56" r="4.4"/><circle cx="64" cy="64" r="4.8"/>
+                <circle cx="38" cy="58" r="4"/><circle cx="52" cy="64" r="3.6"/>
+              </g>
+              <g fill="#f8cfdb">
+                <circle cx="48" cy="50" r="2.2"/><circle cx="62" cy="62" r="2"/><circle cx="40" cy="56" r="1.8"/>
+              </g>
+              <!-- 飘落花瓣 -->
+              <path d="M96 96 q3 3 0 6 q-3 -3 0 -6" fill="#f4b8c8"/>
+              <path d="M112 120 q3 3 0 6 q-3 -3 0 -6" fill="#f4b8c8" opacity=".8"/>
+              <!-- 窗棂 -->
+              <g stroke="#b98d58" stroke-width="5">
+                <line x1="65" y1="36" x2="65" y2="200"/><line x1="111" y1="36" x2="111" y2="200"/>
+                <line x1="20" y1="90" x2="156" y2="90"/><line x1="20" y1="145" x2="156" y2="145"/>
+              </g>
+              <rect x="20" y="36" width="136" height="164" fill="none" stroke="#a87c48" stroke-width="2"/>
+            </g>
+
+            <!-- 暖帘（中间开间上方） -->
+            <g>
+              <rect x="196" y="14" width="168" height="6" rx="3" fill="#6b4c2c"/>
+              <g>
+                <path d="M204 20 h44 v58 q-11 7 -22 0 q-11 7 -22 0 Z" fill="url(#owaNoren)"/>
+                <path d="M258 20 h44 v58 q-11 7 -22 0 q-11 7 -22 0 Z" fill="url(#owaNoren)"/>
+                <path d="M312 20 h44 v56 q-11 7 -22 0 q-11 7 -22 0 Z" fill="url(#owaNoren)"/>
+              </g>
+              <g fill="#ffffff" font-size="22" font-weight="bold" text-anchor="middle" font-family="sans-serif">
+                <text x="226" y="56">お</text><text x="280" y="56">食</text><text x="334" y="54">事</text>
+              </g>
+              <g stroke="#5d7a9c" stroke-width="1.4" opacity=".7">
+                <line x1="212" y1="66" x2="240" y2="66"/><line x1="266" y1="66" x2="294" y2="66"/><line x1="320" y1="64" x2="348" y2="64"/>
+              </g>
+            </g>
+
+            <!-- 右侧开间：挂轴 + 搁板 -->
+            <g>
+              <!-- 挂轴「食」 -->
+              <rect x="398" y="34" width="58" height="120" fill="#fdf8ec" stroke="#8a6236" stroke-width="3"/>
+              <rect x="394" y="28" width="66" height="7" rx="3" fill="#6b4c2c"/>
+              <rect x="394" y="153" width="66" height="7" rx="3" fill="#6b4c2c"/>
+              <text x="427" y="112" font-size="46" font-weight="bold" fill="#4a3826" text-anchor="middle" font-family="serif">食</text>
+              <circle cx="443" cy="132" r="5" fill="#c8553f" opacity=".85"/>
+              <!-- 搁板：清酒瓶 + 陶杯 + 绿植 -->
+              <rect x="468" y="132" width="80" height="7" rx="3" fill="#b9894c"/>
+              <rect x="468" y="139" width="80" height="3" fill="#93683a"/>
+              <path d="M480 132 v-24 q0 -6 5 -6 h2 q5 0 5 6 v24 Z" fill="#5d7a9c"/>
+              <rect x="482" y="96" width="8" height="7" rx="2" fill="#4a6480"/>
+              <rect x="498" y="118" width="14" height="14" rx="3" fill="#e0a37e"/>
+              <rect x="498" y="118" width="14" height="4" rx="2" fill="#c98a64"/>
+              <!-- 小绿植 -->
+              <rect x="524" y="120" width="13" height="12" rx="3" fill="#c98a64"/>
+              <path d="M530 120 q-9 -12 -3 -20 q4 8 3 20 Z" fill="#7db267"/>
+              <path d="M530 120 q9 -14 2 -22 q-3 9 -2 22 Z" fill="#8fbf7a"/>
+            </g>
+
+            <!-- 吊灯（中间，厨师上方）：缩小约 1/3 -->
+            <g>
+              <line x1="280" y1="14" x2="280" y2="44" stroke="#8a6a4a" stroke-width="2"/>
+              <ellipse cx="280" cy="72" rx="24" ry="15" fill="url(#owaLampGlow)"/>
+              <path d="M265 44 h30 l-3.5 14 q-11.5 6 -23 0 Z" fill="#e8b04b"/>
+              <path d="M265 44 h30 l-1 4 h-28 Z" fill="#d89a35"/>
+              <ellipse cx="280" cy="44" rx="15" ry="3.5" fill="#f2c46a"/>
+            </g>
+
+            <!-- 墙脚小板凳（左侧，添生活气） -->
+            <g>
+              <rect x="36" y="230" width="52" height="8" rx="3" fill="#c89a5e"/>
+              <rect x="42" y="238" width="7" height="16" fill="#a87c44"/>
+              <rect x="75" y="238" width="7" height="16" fill="#a87c44"/>
+            </g>
+          </svg>
+          <!-- 小吧台：150px 高，厨师站在台后 -->
+          <div class="oma-bar">
+            <div class="ob-top"></div>
+            <div class="ob-front"></div>
+            <!-- 白瓷瓶 + 兰花（坐在台面上，离吧台右边 8px） -->
+            <div class="oma-vase">
+              <svg class="orchid" viewBox="0 0 26 24">
+                <path class="stem" d="M13 24 Q12 14 17 6"/>
+                <path class="stem" d="M13 24 Q10 16 6 12"/>
+                <path class="leaf" d="M13 24 Q7 20 4 21 Q8 24 13 24 Z"/>
+              </svg>
+              <span class="bloom b1"></span><span class="bloom b2"></span><span class="bloom b3"></span>
+              <div class="vase-body"></div>
+            </div>
+          </div>
+          <div class="oma-dishes" id="omaDishes"></div>
+          <!-- 厨师（与小饭桌同款，点击开工） -->
+          <div class="oma-chef" id="omaChef" title="点我开工">
+            <svg class="chef-svg" viewBox="0 0 140 160">
+              <circle cx="48" cy="62" r="4.5" fill="#ffd9b3"/>
+              <circle cx="92" cy="62" r="4.5" fill="#f0c49c"/>
+              <circle cx="70" cy="64" r="22" fill="#ffd9b3"/>
+              <path d="M70 42 a22 22 0 0 1 0 44 z" fill="#f0c49c"/>
+              <rect x="56" y="56" width="9" height="3" rx="1.5" fill="#8a6a4f"/>
+              <rect x="75" y="56" width="9" height="3" rx="1.5" fill="#8a6a4f"/>
+              <circle cx="60" cy="64" r="3" fill="#3a3a3a"/>
+              <circle cx="61" cy="63" r="1" fill="#ffffff"/>
+              <circle cx="80" cy="64" r="3" fill="#3a3a3a"/>
+              <circle cx="81" cy="63" r="1" fill="#ffffff"/>
+              <circle cx="52" cy="72" r="3.6" fill="#ffb3a7" opacity=".75"/>
+              <circle cx="88" cy="72" r="3.6" fill="#ffb3a7" opacity=".75"/>
+              <ellipse cx="63" cy="75" rx="7" ry="3.8" fill="#ffffff"/>
+              <ellipse cx="77" cy="75" rx="7" ry="3.8" fill="#ececf2"/>
+              <path d="M65 82 q5 4 10 0" stroke="#c96a4a" stroke-width="2" fill="none" stroke-linecap="round"/>
+              <path d="M48 47 C44 39 42 33 43 26 C44 15 52 8 60 8 C63 3 70 1 75 4 C83 2 92 8 94 18 C99 20 101 26 100 32 C99 40 96 45 92 47 Z" fill="#ffffff"/>
+              <path d="M75 4 C83 2 92 8 94 18 C99 20 101 26 100 32 C99 40 96 45 92 47 L75 47 Z" fill="#ececf4"/>
+              <ellipse cx="60" cy="16" rx="9" ry="5.5" fill="#ffffff" opacity=".9"/>
+              <path d="M56 23 q-2 10 0 20" stroke="#d8d8e4" stroke-width="2" fill="none" stroke-linecap="round"/>
+              <path d="M70 19 q-2.5 12 0 24" stroke="#d8d8e4" stroke-width="2" fill="none" stroke-linecap="round"/>
+              <path d="M85 23 q2 10 0 20" stroke="#c9c9d8" stroke-width="2" fill="none" stroke-linecap="round"/>
+              <rect x="46" y="39" width="48" height="12" rx="6" fill="#ffffff"/>
+              <path d="M70 39 h18 a6 6 0 0 1 6 6 a6 6 0 0 1 -6 6 h-18 z" fill="#ececf4"/>
+              <line x1="52" y1="47" x2="88" y2="47" stroke="#dcdce6" stroke-width="1.3" stroke-dasharray="3 3"/>
+              <rect x="42" y="84" width="56" height="46" rx="16" fill="#ffffff"/>
+              <path d="M70 84 h12 a16 16 0 0 1 16 16 v14 a16 16 0 0 1 -16 16 h-12 z" fill="#ececf2"/>
+              <path d="M60 86 h20 l-10 12 z" fill="#e2574c"/>
+              <circle cx="63" cy="106" r="1.9" fill="#c9c9d6"/>
+              <circle cx="63" cy="116" r="1.9" fill="#c9c9d6"/>
+              <circle cx="77" cy="106" r="1.9" fill="#b9b9c8"/>
+              <circle cx="77" cy="116" r="1.9" fill="#b9b9c8"/>
+              <rect x="24" y="88" width="15" height="22" rx="7.5" fill="#ffffff" transform="rotate(38 31 92)"/>
+              <circle cx="22" cy="105" r="6" fill="#ffd9b3"/>
+              <g class="arm-stir-l">
+                <rect x="10" y="98" width="22" height="16" rx="4" fill="#e8f4fb"/>
+                <path d="M10 106 h22 M16 98 v16 M24 98 v16" stroke="#c4deee" stroke-width="1.4"/>
+              </g>
+              <g class="arm-stir">
+                <rect x="96" y="90" width="26" height="14" rx="7" fill="#ffffff"/>
+                <rect x="96" y="90" width="13" height="14" rx="7" fill="#ececf2"/>
+                <circle cx="121" cy="97" r="6.5" fill="#ffd9b3"/>
+                <rect x="116" y="97" width="5" height="24" rx="2.5" fill="#c98d5e" transform="rotate(14 118 99)"/>
+              </g>
+              <rect x="98" y="116" width="38" height="24" rx="10" fill="#8a8f9c"/>
+              <path d="M98 126 a10 10 0 0 1 10 -10 v24 a10 10 0 0 1 -10 -10 z" fill="#767b89"/>
+              <ellipse cx="117" cy="117" rx="17" ry="5" fill="#ffd98a"/>
+              <ellipse cx="117" cy="117" rx="11" ry="3" fill="#ffc95e"/>
+            </svg>
+            <div class="oma-bubble" id="omaBubble"></div>
+          </div>
+          <!-- 忙碌时的锅边香气 -->
+          <div class="oma-sweat" id="omaSweat">
+            <i></i><i></i><i></i><i></i><i></i>
+          </div>
+        </div>
+        <div class="oma-count-row" id="omaCountRow">
+          <span class="oc-label">菜品数量</span>
+          <div class="oma-count" id="omaCount">
+            <button class="on-btn" data-n="1" onclick="setOmaCount(1)">1 道</button>
+            <button class="on-btn" data-n="2" onclick="setOmaCount(2)">2 道</button>
+            <button class="on-btn" data-n="3" onclick="setOmaCount(3)">3 道</button>
+            <button class="on-btn" data-n="4" onclick="setOmaCount(4)">4 道</button>
+          </div>
+        </div>
+        <div class="oma-actions" id="omaActions" style="display:none">
+          <div class="oma-total" id="omaTotal"></div>
+          <div class="oma-btns">
+            <button class="btn btn-again" onclick="startOmakase()">🔄 换一套</button>
+            <button class="btn btn-add2" onclick="addOmakase()">＋ 全部加入餐盘</button>
+            <button class="btn btn-close" onclick="gachaBack()">返回模式选择</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="view" id="viewBmi">
+  <div class="page-wrap">
+    <div class="panel">
+      <div class="panel-head"><h2>⚖️ BMI 计算器</h2></div>
+      <div class="bmi-form">
+        <div class="bmi-field">
+          <label>身高（cm）</label>
+          <input type="number" id="bmiHeight" placeholder="如：170" min="80" max="250">
+        </div>
+        <div class="bmi-field">
+          <label>体重（kg）</label>
+          <input type="number" id="bmiWeight" placeholder="如：60" min="20" max="300">
+        </div>
+        <div class="bmi-field">
+          <label>年龄</label>
+          <input type="number" id="bmiAge" placeholder="如：25" min="10" max="100">
+        </div>
+        <div class="bmi-field">
+          <label>性别</label>
+          <div class="sex-switch">
+            <button class="sex-btn active" data-sex="male" onclick="pickSex('male')">👨 男</button>
+            <button class="sex-btn" data-sex="female" onclick="pickSex('female')">👩 女</button>
+          </div>
+        </div>
+        <button class="btn-bmi" onclick="calcBmi()">开始计算</button>
+      </div>
+      <div class="bmi-result" id="bmiResult">
+        <div class="bmi-num" id="bmiNum">--</div>
+        <div class="bmi-tag"><span id="bmiTag"></span></div>
+        <div class="bmi-bar"><div class="bmi-pointer" id="bmiPointer"></div></div>
+        <div class="bmi-scale"><span>偏瘦 &lt;18.5</span><span>正常 18.5-24</span><span>超重 24-28</span><span>肥胖 ≥28</span></div>
+
+        <!-- 体脂率结果 -->
+        <div class="bf-block">
+          <div class="bf-title">🧬 体脂率估算</div>
+          <div class="bf-num"><span id="bfNum">--</span><small>%</small></div>
+          <div class="bmi-tag"><span id="bfTag"></span></div>
+          <div class="bmi-bar bf-bar"><div class="bmi-pointer" id="bfPointer"></div></div>
+          <div class="bmi-scale" id="bfScale"></div>
+        </div>
+
+        <div class="bmi-advice" id="bmiAdvice"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 随机结果弹窗：开餐盖抽卡 -->
+<div class="modal-mask" id="modalMask" onclick="closeModal(event)">
+  <div class="modal gacha-modal">
+    <div class="cloche-stage" id="clocheStage" onclick="openCloche()">
+      <div class="cloche-glow" id="clocheGlow"></div>
+      <div class="cloche-rays" id="clocheRays">
+        <span style="transform:rotate(-50deg)"></span>
+        <span style="transform:rotate(-25deg)"></span>
+        <span style="transform:rotate(0deg)"></span>
+        <span style="transform:rotate(25deg)"></span>
+        <span style="transform:rotate(50deg)"></span>
+      </div>
+      <div class="cloche-food">
+        <div class="cf-emoji" id="mEmoji">🍜</div>
+        <div class="cf-name" id="mName">--</div>
+        <div class="cf-kcal" id="mKcal">-- kcal</div>
+        <div><span class="kcal-tier" id="mTier"></span></div>
+      </div>
+      <div class="cloche-plate"></div>
+      <div class="cloche-dome"><div class="dome-knob"></div></div>
+    </div>
+    <div class="cloche-hint" id="clocheHint">👆 点击盖子，揭晓今日美味</div>
+    <button class="btn btn-again" onclick="luckyDraw()">🔄 再来一个</button>
+    <button class="btn btn-add2" onclick="addLucky()">＋ 加入餐盘</button>
+    <button class="btn btn-close" onclick="hideModal()">关闭</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- 右下角小字水印：淡淡的 -->
+<div class="wm-corner">Akoasm 🌸</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@twemoji/api@14.0.2/dist/twemoji.min.js" crossorigin="anonymous"></script>
+<script>
+const BASE_URL = "https://eat-vvq4.onrender.com";
+// ============ Twemoji：把页面 emoji 替换为扁平风图片（类苹果风格） ============
+function applyTwemoji(root) {
+  if (typeof twemoji === "undefined") return;
+  twemoji.parse(root || document.body, {
+    folder: "svg", ext: ".svg",
+    attributes: () => ({ class: "twemoji", draggable: "false" })
+  });
+}
+// 初始 + 每次视图渲染后自动应用（页面大量 innerHTML 动态内容）
+const _origGoView = null;
+window.addEventListener("load", () => applyTwemoji());
+
+// ============ 食物数据库 ============
+const FOODS = [
+  // 中餐家常菜
+  { name: "宫保鸡丁", emoji: "🍗", kcal: 280, cat: "中餐" },
+  { name: "鱼香肉丝", emoji: "🥩", kcal: 260, cat: "中餐" },
+  { name: "麻婆豆腐", emoji: "🌶️", kcal: 220, cat: "中餐" },
+  { name: "红烧肉", emoji: "🍖", kcal: 470, cat: "中餐" },
+  { name: "番茄炒蛋", emoji: "🍅", kcal: 160, cat: "中餐" },
+  { name: "青椒土豆丝", emoji: "🥔", kcal: 130, cat: "中餐" },
+  { name: "糖醋排骨", emoji: "🍖", kcal: 390, cat: "中餐" },
+  { name: "蒜蓉西兰花", emoji: "🥦", kcal: 90, cat: "中餐" },
+  { name: "清炒莴笋丝", emoji: "🥬", kcal: 70, cat: "中餐" },
+  { name: "清炒空心菜", emoji: "🥬", kcal: 80, cat: "中餐" },
+  { name: "蒜蓉上海青", emoji: "🥬", kcal: 85, cat: "中餐" },
+  { name: "凉拌黄瓜", emoji: "🥒", kcal: 60, cat: "中餐" },
+  { name: "凉拌木耳", emoji: "🍄", kcal: 70, cat: "中餐" },
+  { name: "凉拌海带丝", emoji: "🌊", kcal: 65, cat: "中餐" },
+  { name: "皮蛋豆腐", emoji: "🥚", kcal: 150, cat: "中餐" },
+  { name: "小葱拌豆腐", emoji: "🧈", kcal: 120, cat: "中餐" },
+  { name: "麻酱菠菜", emoji: "🥬", kcal: 110, cat: "中餐" },
+  { name: "拍黄瓜拌花生", emoji: "🥜", kcal: 130, cat: "中餐" },
+  { name: "凉拌藕片", emoji: "🪷", kcal: 90, cat: "中餐" },
+  { name: "凉拌苦瓜", emoji: "🥒", kcal: 55, cat: "中餐" },
+  { name: "凉拌鸡丝", emoji: "🍗", kcal: 180, cat: "中餐" },
+  { name: "凉拌腐竹", emoji: "🫘", kcal: 160, cat: "中餐" },
+  { name: "蒜蓉油麦菜", emoji: "🥬", kcal: 90, cat: "中餐" },
+  { name: "清炒豆苗", emoji: "🌱", kcal: 75, cat: "中餐" },
+  { name: "蚝油生菜", emoji: "🥬", kcal: 90, cat: "中餐" },
+  { name: "清蒸鲈鱼", emoji: "🐟", kcal: 180, cat: "中餐" },
+  { name: "葱姜鸡", emoji: "🍗", kcal: 240, cat: "中餐" },
+  { name: "回锅肉", emoji: "🥓", kcal: 420, cat: "中餐" },
+  // 湘菜（湖南长沙特色）
+  { name: "辣椒炒肉", emoji: "🌶️", kcal: 350, cat: "湘菜" },
+  { name: "剁椒鱼头", emoji: "🐟", kcal: 420, cat: "湘菜" },
+  { name: "农家小炒肉", emoji: "🥩", kcal: 380, cat: "湘菜" },
+  { name: "毛氏红烧肉", emoji: "🍖", kcal: 490, cat: "湘菜" },
+  { name: "口味虾", emoji: "🦞", kcal: 450, cat: "湘菜" },
+  { name: "长沙臭豆腐", emoji: "🧆", kcal: 380, cat: "湘菜" },
+  { name: "糖油粑粑", emoji: "🍡", kcal: 320, cat: "湘菜" },
+  { name: "长沙米粉", emoji: "🍜", kcal: 450, cat: "湘菜" },
+  { name: "小炒黄牛肉", emoji: "🥩", kcal: 360, cat: "湘菜" },
+  { name: "擂辣椒皮蛋", emoji: "🥚", kcal: 180, cat: "湘菜" },
+  { name: "湘西外婆菜", emoji: "🥬", kcal: 150, cat: "湘菜" },
+  { name: "剁椒莴笋丝", emoji: "🌶️", kcal: 90, cat: "湘菜" },
+  { name: "凉拌折耳根", emoji: "🌿", kcal: 60, cat: "湘菜" },
+  { name: "剁椒拌皮蛋", emoji: "🥚", kcal: 170, cat: "湘菜" },
+  { name: "凉拌卤牛肉", emoji: "🥩", kcal: 220, cat: "湘菜" },
+  { name: "紫苏拌黄瓜", emoji: "🥒", kcal: 65, cat: "湘菜" },
+  { name: "凉拌捆鸡", emoji: "🍗", kcal: 190, cat: "湘菜" },
+  { name: "凉拌香干丝", emoji: "🧈", kcal: 140, cat: "湘菜" },
+  { name: "红油猪耳", emoji: "🐷", kcal: 230, cat: "湘菜" },
+  { name: "东安子鸡", emoji: "🍗", kcal: 330, cat: "湘菜" },
+  { name: "永州血鸭", emoji: "🦆", kcal: 400, cat: "湘菜" },
+  { name: "腊味合蒸", emoji: "🥓", kcal: 460, cat: "湘菜" },
+  { name: "干锅肥肠", emoji: "🍲", kcal: 520, cat: "湘菜" },
+  { name: "手撕包菜", emoji: "🥬", kcal: 140, cat: "湘菜" },
+  { name: "酸豆角炒肉末", emoji: "🥬", kcal: 230, cat: "湘菜" },
+  { name: "剁椒蒸芋头", emoji: "🍠", kcal: 190, cat: "湘菜" },
+  { name: "酱板鸭", emoji: "🦆", kcal: 430, cat: "湘菜" },
+  { name: "刮凉粉", emoji: "🍝", kcal: 210, cat: "湘菜" },
+  { name: "麻辣子鸡", emoji: "🍗", kcal: 390, cat: "湘菜" },
+  { name: "组庵豆腐", emoji: "🍲", kcal: 240, cat: "湘菜" },
+  // 主食面饭
+  { name: "白米饭(一碗)", emoji: "🍚", kcal: 230, cat: "主食" },
+  { name: "蛋炒饭", emoji: "🍳", kcal: 450, cat: "主食" },
+  { name: "兰州拉面", emoji: "🍜", kcal: 480, cat: "主食" },
+  { name: "炸酱面", emoji: "🍝", kcal: 520, cat: "主食" },
+  { name: "重庆小面", emoji: "🌶️", kcal: 510, cat: "主食" },
+  { name: "牛肉面", emoji: "🍜", kcal: 550, cat: "主食" },
+  { name: "饺子(15个)", emoji: "🥟", kcal: 600, cat: "主食" },
+  { name: "鲜肉包子(2个)", emoji: "🥟", kcal: 440, cat: "主食" },
+  { name: "煎饼果子", emoji: "🫓", kcal: 500, cat: "主食" },
+  { name: "扬州炒饭", emoji: "🍛", kcal: 480, cat: "主食" },
+  // 快餐小吃
+  { name: "汉堡", emoji: "🍔", kcal: 550, cat: "快餐" },
+  { name: "炸鸡块(6块)", emoji: "🍗", kcal: 420, cat: "快餐" },
+  { name: "薯条(中份)", emoji: "🍟", kcal: 365, cat: "快餐" },
+  { name: "披萨(2片)", emoji: "🍕", kcal: 560, cat: "快餐" },
+  { name: "热狗", emoji: "🌭", kcal: 380, cat: "快餐" },
+  { name: "三明治", emoji: "🥪", kcal: 320, cat: "快餐" },
+  { name: "鸡肉卷", emoji: "🌯", kcal: 450, cat: "快餐" },
+  // 麦当劳
+  { name: "巨无霸", emoji: "🍔", kcal: 550, cat: "麦当劳" },
+  { name: "麦辣鸡腿堡", emoji: "🍔", kcal: 500, cat: "麦当劳" },
+  { name: "板烧鸡腿堡", emoji: "🍔", kcal: 440, cat: "麦当劳" },
+  { name: "双层吉士汉堡", emoji: "🍔", kcal: 450, cat: "麦当劳" },
+  { name: "麦香鱼", emoji: "🍔", kcal: 340, cat: "麦当劳" },
+  { name: "麦乐鸡(5块)", emoji: "🍗", kcal: 210, cat: "麦当劳" },
+  { name: "麦辣鸡翅(2块)", emoji: "🍗", kcal: 260, cat: "麦当劳" },
+  { name: "那么大鸡排", emoji: "🍗", kcal: 450, cat: "麦当劳" },
+  { name: "麦旋风", emoji: "🍦", kcal: 330, cat: "麦当劳" },
+  { name: "圆筒冰淇淋", emoji: "🍦", kcal: 130, cat: "麦当劳" },
+  { name: "香芋派", emoji: "🥧", kcal: 240, cat: "麦当劳" },
+  { name: "菠萝派", emoji: "🥧", kcal: 240, cat: "麦当劳" },
+  { name: "猪柳蛋麦满分", emoji: "🥯", kcal: 400, cat: "麦当劳" },
+  { name: "吉士蛋麦满分", emoji: "🥯", kcal: 330, cat: "麦当劳" },
+  { name: "热香饼", emoji: "🥞", kcal: 350, cat: "麦当劳" },
+  { name: "玉米杯", emoji: "🌽", kcal: 70, cat: "麦当劳" },
+  // 日韩料理
+  { name: "寿司拼盘(8枚)", emoji: "🍣", kcal: 350, cat: "日韩" },
+  { name: "日式拉面", emoji: "🍜", kcal: 530, cat: "日韩" },
+  { name: "咖喱饭", emoji: "🍛", kcal: 620, cat: "日韩" },
+  { name: "照烧鸡腿饭", emoji: "🍱", kcal: 580, cat: "日韩" },
+  { name: "石锅拌饭", emoji: "🍲", kcal: 560, cat: "日韩" },
+  { name: "韩式炸鸡", emoji: "🍗", kcal: 650, cat: "日韩" },
+  { name: "鳗鱼饭", emoji: "🍱", kcal: 590, cat: "日韩" },
+  // 轻食沙拉
+  { name: "鸡胸肉沙拉", emoji: "🥗", kcal: 280, cat: "轻食" },
+  { name: "牛油果沙拉", emoji: "🥑", kcal: 320, cat: "轻食" },
+  { name: "藜麦能量碗", emoji: "🥣", kcal: 380, cat: "轻食" },
+  { name: "谷物饭", emoji: "🍚", kcal: 350, cat: "轻食" },
+  { name: "煎蛋", emoji: "🍳", kcal: 120, cat: "轻食" },
+  { name: "水煮鸡胸肉", emoji: "🍗", kcal: 165, cat: "轻食" },
+  { name: "全麦三明治", emoji: "🥪", kcal: 290, cat: "轻食" },
+  { name: "蔬菜卷", emoji: "🌯", kcal: 240, cat: "轻食" },
+  // 汤粉粥
+  { name: "酸辣粉", emoji: "🍜", kcal: 460, cat: "汤粉" },
+  { name: "螺蛳粉", emoji: "🍲", kcal: 530, cat: "汤粉" },
+  { name: "米线", emoji: "🍜", kcal: 420, cat: "汤粉" },
+  { name: "皮蛋瘦肉粥", emoji: "🥣", kcal: 220, cat: "汤粉" },
+  { name: "紫菜蛋花汤", emoji: "🍲", kcal: 60, cat: "汤粉" },
+  { name: "玉米排骨汤", emoji: "🍲", kcal: 180, cat: "汤粉" },
+  // 火锅烧烤
+  { name: "火锅(人均)", emoji: "🍲", kcal: 900, cat: "火锅烧烤" },
+  { name: "麻辣烫", emoji: "🌶️", kcal: 550, cat: "火锅烧烤" },
+  { name: "烤串(10串)", emoji: "🍢", kcal: 600, cat: "火锅烧烤" },
+  { name: "烤冷面", emoji: "🫓", kcal: 430, cat: "火锅烧烤" },
+  { name: "烤鱼", emoji: "🐟", kcal: 700, cat: "火锅烧烤" },
+  // 甜品饮品
+  { name: "珍珠奶茶", emoji: "🧋", kcal: 400, cat: "甜品饮品" },
+  { name: "杨枝甘露", emoji: "🥭", kcal: 260, cat: "甜品饮品" },
+  { name: "冰淇淋(单球)", emoji: "🍦", kcal: 200, cat: "甜品饮品" },
+  { name: "提拉米苏", emoji: "🍰", kcal: 350, cat: "甜品饮品" },
+  { name: "鲜榨橙汁", emoji: "🍊", kcal: 110, cat: "甜品饮品" },
+  { name: "酸奶杯", emoji: "🥛", kcal: 150, cat: "甜品饮品" },
+  { name: "美式咖啡", emoji: "☕", kcal: 10, cat: "甜品饮品" },
+  { name: "拿铁咖啡", emoji: "☕", kcal: 150, cat: "甜品饮品" },
+  { name: "可乐(330ml)", emoji: "🥤", kcal: 140, cat: "甜品饮品" },
+  { name: "麦炫酷", emoji: "🍨", kcal: 250, cat: "甜品饮品" },
+];
+
+const CATS = ["全部", ...new Set(FOODS.map(f => f.cat))];
+const MEAL_TARGET = { lunch: 700, dinner: 600 };
+const HISTORY_KEY = "mealHistory";
+const BLACKLIST_KEY = "mealBlacklist";
+const PLATE_KEY = "mealPlate";
+
+// ============ 多用户管理 ============
+const USERS_KEY = "mealUsers";
+const CURRENT_USER_KEY = "mealCurrentUser";
+
+function loadUsers() {
+  try { return JSON.parse(localStorage.getItem(USERS_KEY)) || ["default"]; }
+  catch { return ["default"]; }
+}
+function saveUsers(list) {
+  localStorage.setItem(USERS_KEY, JSON.stringify(list));
+}
+let currentUser = localStorage.getItem(CURRENT_USER_KEY) || "default";
+if (!loadUsers().includes(currentUser)) currentUser = "default";
+
+// 每个用户的数据 key 互相独立
+function userKey(base) { return `${base}__${currentUser}`; }
+
+// ============ 用户资料（头像 / 颜色） ============
+// 哑光纯色（不艳丽）
+const MUTED_COLORS = ["#8fa6b8", "#a3b18a", "#c9a7a7", "#b5a1c9", "#c9b48f", "#8fb8b2", "#bc9ec1", "#9aa8c7"];
+const PROFILE_KEY = "mealProfile";
+
+function hashStr(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h;
+}
+function getProfile(uid) {
+  try {
+    const p = JSON.parse(localStorage.getItem(`${PROFILE_KEY}__${uid}`));
+    if (p && p.color) return p;
+  } catch {}
+  // 默认：按 id 分配一个哑光纯色
+  return { color: MUTED_COLORS[hashStr(uid) % MUTED_COLORS.length], avatar: null };
+}
+function saveProfile(uid, p) {
+  localStorage.setItem(`${PROFILE_KEY}__${uid}`, JSON.stringify(p));
+}
+function userDisplayName(uid) { return uid === "default" ? "默认用户" : uid; }
+
+// 把头像/名字渲染到元素上（圆形头像）
+function paintAvatar(el, uid, initialSize) {
+  const p = getProfile(uid);
+  if (p.avatar) {
+    el.style.backgroundImage = `url(${p.avatar})`;
+    el.style.backgroundColor = "transparent";
+    el.textContent = "";
+  } else {
+    el.style.backgroundImage = "none";
+    el.style.backgroundColor = p.color;
+    el.textContent = userDisplayName(uid).slice(0, 1).toUpperCase();
+  }
+}
+function renderAvatar() {
+  paintAvatar(document.getElementById("uAvatar"), currentUser);
+}
+
+// ============ 资料编辑弹窗 ============
+let pendingAvatar = undefined; // 待保存的新头像（dataURL）
+function openUserEdit() {
+  pendingAvatar = undefined;
+  document.getElementById("umName").value = userDisplayName(currentUser);
+  paintAvatar(document.getElementById("umAvatar"), currentUser);
+  document.getElementById("userModalMask").classList.add("show");
+}
+function hideUserEdit() {
+  document.getElementById("userModalMask").classList.remove("show");
+}
+document.getElementById("umFile").addEventListener("change", e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = new Image();
+    img.onload = () => {
+      // 压缩到 96x96，避免 localStorage 过大
+      const cvs = document.createElement("canvas");
+      cvs.width = cvs.height = 96;
+      const ctx = cvs.getContext("2d");
+      const side = Math.min(img.width, img.height);
+      ctx.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, 96, 96);
+      pendingAvatar = cvs.toDataURL("image/jpeg", 0.85);
+      const el = document.getElementById("umAvatar");
+      el.style.backgroundImage = `url(${pendingAvatar})`;
+      el.textContent = "";
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+  e.target.value = "";
+});
+function saveUserEdit() {
+  const newIdRaw = document.getElementById("umName").value.trim();
+  if (!newIdRaw) { showToast("ID 不能为空哦～"); return; }
+  const newId = (currentUser === "default" && newIdRaw === "默认用户") ? "default" : newIdRaw;
+
+  // 改 ID：迁移该用户的全部数据
+  if (newId !== currentUser) {
+    const users = loadUsers();
+    if (users.includes(newId)) { showToast("这个 ID 已被占用，换一个吧～"); return; }
+    [HISTORY_KEY, BLACKLIST_KEY, PLATE_KEY, PROFILE_KEY].forEach(k => {
+      const v = localStorage.getItem(`${k}__${currentUser}`);
+      if (v !== null) {
+        localStorage.setItem(`${k}__${newId}`, v);
+        localStorage.removeItem(`${k}__${currentUser}`);
+      }
+    });
+    const idx = users.indexOf(currentUser);
+    if (idx >= 0) { users[idx] = newId; saveUsers(users); }
+    currentUser = newId;
+    localStorage.setItem(CURRENT_USER_KEY, newId);
+  }
+  if (pendingAvatar !== undefined) {
+    const p = getProfile(currentUser);
+    p.avatar = pendingAvatar;
+    saveProfile(currentUser, p);
+  }
+  renderUserSelect();
+  renderAvatar();
+  plate = loadPlate();
+  renderGrid(); renderPlate(); renderHomeStat();
+  hideUserEdit();
+  showToast("资料已保存 ✅");
+}
+
+// 旧数据迁移：把未分用户的数据归到 default 名下
+(function migrateOldData() {
+  ["mealHistory", "mealBlacklist"].forEach(k => {
+    const old = localStorage.getItem(k);
+    if (old && !localStorage.getItem(`${k}__default`)) {
+      localStorage.setItem(`${k}__default`, old);
+    }
+    if (old) localStorage.removeItem(k);
+  });
+})();
+
+function renderUserSelect() {
+  const sel = document.getElementById("userSelect");
+  sel.innerHTML = "";
+  loadUsers().forEach(u => {
+    const opt = document.createElement("option");
+    opt.value = u;
+    opt.textContent = u === "default" ? "默认用户" : u;
+    sel.appendChild(opt);
+  });
+  const add = document.createElement("option");
+  add.value = "__add__";
+  add.textContent = "➕ 新增用户…";
+  sel.appendChild(add);
+  sel.value = currentUser;
+}
+
+function onUserChange(val) {
+  const sel = document.getElementById("userSelect");
+  if (val === "__add__") {
+    const id = prompt("输入新用户的 ID（字母/数字/中文均可）：");
+    if (id && id.trim()) {
+      const uid = id.trim();
+      const users = loadUsers();
+      if (!users.includes(uid)) {
+        users.push(uid);
+        saveUsers(users);
+      }
+      switchUser(uid);
+      return;
+    }
+    sel.value = currentUser; // 取消则还原
+    return;
+  }
+  switchUser(val);
+}
+
+function switchUser(uid) {
+  currentUser = uid;
+  localStorage.setItem(CURRENT_USER_KEY, uid);
+  renderUserSelect();
+  renderAvatar();
+  plate = loadPlate();
+  renderGrid();
+  renderPlate();
+  renderHomeStat();
+  // 若当前停在记录/垃圾桶页，同步刷新
+  if (document.getElementById("viewHistory").classList.contains("active")) renderHistory();
+  if (document.getElementById("viewBin").classList.contains("active")) renderBin();
+  showToast(`已切换到用户「${userDisplayName(uid)}」👤`);
+}
+
+// ============ 扩展热量数据库（每份约值，用于自定义食物智能匹配） ============
+const EXTRA_KCAL = {
+  "辣椒炒肉": 350, "剁椒鱼头": 420, "农家小炒肉": 380, "小炒肉": 380,
+  "毛氏红烧肉": 490, "红烧肉": 470, "口味虾": 450, "小龙虾": 400,
+  "臭豆腐": 380, "糖油粑粑": 320, "葱油粑粑": 300, "长沙米粉": 450,
+  "米粉": 420, "肉丝粉": 430, "牛肉粉": 480, "辣椒炒蛋": 220,
+  "小炒黄牛肉": 360, "黄牛肉": 330, "擂辣椒皮蛋": 180, "皮蛋": 170,
+  "外婆菜": 150, "东安鸡": 330, "东安子鸡": 330, "永州血鸭": 400,
+  "血鸭": 400, "腊味合蒸": 460, "腊肉": 500, "腊肠": 450,
+  "干锅肥肠": 520, "肥肠": 480, "手撕包菜": 140, "包菜": 120,
+  "酸豆角肉末": 230, "剁椒芋头": 190, "酱板鸭": 430, "刮凉粉": 210,
+  "凉粉": 150, "麻辣子鸡": 390, "组庵豆腐": 240, "香干炒肉": 300,
+  "香干": 150, "剁椒炒鸡蛋": 240, "蒸蛋": 140, "紫苏煎黄瓜": 110,
+  "毛血旺": 480, "干锅花菜": 220, "干锅土豆片": 260, "土匪猪肝": 280,
+  "爆炒猪肝": 280, "猪肝": 260, "宁乡口味蛇": 380, "剁椒排骨": 420,
+  "青椒肉丝": 250, "木须肉": 260, "京酱肉丝": 330, "水煮鱼": 400,
+  "水煮肉片": 380, "酸菜鱼": 350, "清蒸鱼": 180, "红烧鱼": 320,
+  "可乐鸡翅": 360, "红烧鸡翅": 340, "白切鸡": 260, "盐焗鸡": 300,
+  "黄焖鸡": 420, "大盘鸡": 460, "辣子鸡": 420, "三杯鸡": 380,
+  "啤酒鸭": 400, "红烧排骨": 430, "粉蒸肉": 450, "梅菜扣肉": 500,
+  "东坡肉": 520, "狮子头": 400, "糖醋里脊": 380, "锅包肉": 400,
+  "溜肉段": 380, "地三鲜": 220, "干煸豆角": 200, "蚝油生菜": 90,
+  "清炒时蔬": 100, "蒜蓉油麦菜": 90, "上汤娃娃菜": 100, "虎皮青椒": 130,
+  "韭菜炒蛋": 180, "洋葱炒肉": 260, "芹菜炒香干": 200, "土豆丝": 130,
+  "西红柿鸡蛋面": 400, "鸡蛋面": 380, "炒面": 500, "炒粉": 520,
+  "盖浇饭": 550, "卤肉饭": 560, "煲仔饭": 600, "黄焖鸡米饭": 620,
+  "馄饨": 350, "小笼包": 420, "生煎包": 460, "锅贴": 450,
+  "烧麦": 380, "油条": 390, "豆浆": 80, "茶叶蛋": 90, "荷包蛋": 120,
+  "玉米": 110, "红薯": 130, "紫薯": 120, "南瓜": 50,
+  "冬瓜排骨汤": 150, "莲藕排骨汤": 170, "鸡汤": 160, "老鸭汤": 200,
+  "酸辣汤": 100, "胡辣汤": 150, "瓦罐汤": 180, "鱼头豆腐汤": 190,
+  "沙拉": 250, "水果捞": 180, "鸡蛋仔": 330, "章鱼小丸子": 300,
+  "清炒莴笋丝": 70, "莴笋丝": 70, "莴笋": 60, "清炒空心菜": 80,
+  "空心菜": 70, "蒜蓉上海青": 85, "上海青": 75, "凉拌黄瓜": 60,
+  "凉拌木耳": 70, "凉拌海带丝": 65, "海带丝": 60, "皮蛋豆腐": 150,
+  "小葱拌豆腐": 120, "麻酱菠菜": 110, "拌花生": 130, "凉拌藕片": 90,
+  "藕片": 80, "凉拌苦瓜": 55, "苦瓜": 45, "凉拌鸡丝": 180,
+  "凉拌腐竹": 160, "腐竹": 150, "清炒豆苗": 75, "豆苗": 65,
+  "剁椒莴笋丝": 90, "凉拌折耳根": 60, "折耳根": 50, "剁椒拌皮蛋": 170,
+  "凉拌卤牛肉": 220, "卤牛肉": 200, "紫苏拌黄瓜": 65, "凉拌捆鸡": 190,
+  "捆鸡": 180, "凉拌香干丝": 140, "红油猪耳": 230, "猪耳": 210,
+  "葱姜鸡": 240, "姜葱鸡": 240,
+  "鸡排": 450, "烤肠": 280, "关东煮": 250, "饭团": 280,
+  "蛋挞": 220, "蛋糕": 350, "面包": 280, "牛奶": 130, "咖啡": 50,
+  "可乐": 140, "雪碧": 140, "芬达": 130, "麦炫酷": 250, "麦旋风": 330, "奶茶": 400,
+  "巨无霸": 550, "麦辣鸡腿堡": 500, "板烧鸡腿堡": 440, "双层吉士汉堡": 450,
+  "麦香鱼": 340, "麦乐鸡": 210, "麦辣鸡翅": 260, "那么大鸡排": 450,
+  "圆筒冰淇淋": 130, "香芋派": 240, "菠萝派": 240, "猪柳蛋麦满分": 400,
+  "吉士蛋麦满分": 330, "热香饼": 350, "玉米杯": 70, "开心乐园餐": 500,
+};
+const KCAL_DB = {};
+Object.assign(KCAL_DB, EXTRA_KCAL);
+FOODS.forEach(f => { KCAL_DB[f.name] = f.kcal; });
+
+// ============ 页面切换 ============
+const VIEW_TITLES = { home: "🍚 今天吃什么", food: "🍽️ 选餐", history: "📖 进食记录", bin: "🗑️ 厨余垃圾", table: "🍽️ 小饭桌", gacha: "🎲 随机来一道", bmi: "⚖️ BMI 计算器" };
+function goView(name) {
+  stopBelt();
+  stopOma();
+  document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+  document.getElementById("view" + name[0].toUpperCase() + name.slice(1)).classList.add("active");
+  document.getElementById("pageTitle").textContent = VIEW_TITLES[name];
+  document.getElementById("backBtn").style.display = name === "home" ? "none" : "inline-block";
+  if (name === "home") renderHomeStat();
+  if (name === "history") renderHistory();
+  if (name === "bin") renderBin();
+  if (name === "table") renderTable();
+  if (name === "gacha") gachaBack();
+  if (name === "food") renderQuickStrips();
+  applyTwemoji();
+  window.scrollTo(0, 0);
+}
+function goHome() { goView("home"); }
+
+// ============ 小猫：喂食存储（2000kcal 胃，按天重置，所有用户累积） ============
+const CAT_FEED_KEY = "catFeed";
+const CAT_STOMACH_KCAL = 2000;
+function loadCatFeed() {
+  try {
+    const s = JSON.parse(localStorage.getItem(CAT_FEED_KEY));
+    if (s && s.date === todayStr()) return s;
+  } catch {}
+  return { date: todayStr(), kcal: 0, fed: [] };   // fed: [{uid, name}] 一个菜只能喂一次
+}
+function saveCatFeed(s) { localStorage.setItem(CAT_FEED_KEY, JSON.stringify(s)); }
+
+// ============ 小饭桌：可提起的小猫 ============
+(function catDrag() {
+  const cat = document.querySelector(".bg-cat");
+  const scene = document.getElementById("tableScene");
+  if (!cat || !scene) return;
+  let startX, startY, baseLeft, baseTop, moved = false;
+
+  // ===== 空闲溜达：5 秒无操作后，随机左右缓慢移动、停顿 =====
+  let idleTimer = null, wanderTimer = null;
+  const rand = (a, b) => a + Math.random() * (b - a);
+
+  function stopWander() {
+    if (wanderTimer) { clearTimeout(wanderTimer); wanderTimer = null; }
+    cat.style.transition = "";   // 清掉水平缓动，避免拖拽时跟手延迟
+  }
+  function wander() {
+    wanderTimer = null;
+    // 小饭桌页不可见时不溜达，过 5 秒再看看
+    if (!document.getElementById("viewTable").classList.contains("active")) { scheduleIdle(); return; }
+    const sr = scene.getBoundingClientRect(), cr = cat.getBoundingClientRect();
+    if (!moved) {   // 还没被拖过：先切换到 left/top 定位
+      cat.style.left = (cr.left - sr.left) + "px";
+      cat.style.top = (cr.top - sr.top) + "px";
+      cat.style.right = "auto"; cat.style.bottom = "auto";
+      moved = true;
+    }
+    const cur = parseFloat(cat.style.left);
+    const target = rand(0, sr.width - cr.width);          // 场景内随机落点
+    const dur = Math.max(2, Math.abs(target - cur) / 45); // 约 45px/s，慢慢走
+    cat.style.transition = `left ${dur}s ease-in-out`;
+    cat.style.left = target + "px";
+    wanderTimer = setTimeout(wander, dur * 1000 + rand(1200, 3600));  // 走完停一会儿再走下一段
+  }
+  function scheduleIdle() {
+    if (idleTimer) clearTimeout(idleTimer);
+    if (wanderTimer) { clearTimeout(wanderTimer); wanderTimer = null; }
+    idleTimer = setTimeout(wander, 5000);   // 5 秒无操作才进入空闲状态
+  }
+
+  cat.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    cat.setPointerCapture(e.pointerId);
+    stopWander();
+    if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
+    const cr = cat.getBoundingClientRect(), sr = scene.getBoundingClientRect();
+    // 统一切换为 left/top 定位（若正在溜达，同步到当前视觉位置，避免跳变）
+    cat.style.left = (cr.left - sr.left) + "px";
+    cat.style.top = (cr.top - sr.top) + "px";
+    cat.style.right = "auto"; cat.style.bottom = "auto";
+    moved = true;
+    startX = e.clientX; startY = e.clientY;
+    baseLeft = parseFloat(cat.style.left); baseTop = parseFloat(cat.style.top);
+    cat.classList.remove("falling");
+    cat.classList.add("dragging");
+  });
+  cat.addEventListener("pointermove", e => {
+    if (!cat.classList.contains("dragging")) return;
+    const sr = scene.getBoundingClientRect(), cr = cat.getBoundingClientRect();
+    let nl = baseLeft + e.clientX - startX;
+    let nt = baseTop + e.clientY - startY;
+    nl = Math.max(0, Math.min(sr.width - cr.width, nl));   // 不出场景
+    nt = Math.max(0, Math.min(sr.height - cr.height, nt));
+    cat.style.left = nl + "px";
+    cat.style.top = nt + "px";
+  });
+  const drop = () => {
+    if (!cat.classList.contains("dragging")) return;
+    cat.classList.remove("dragging");
+    // 下落回到原始高度（bottom 3.5%），左右位置保留
+    const sr = scene.getBoundingClientRect(), cr = cat.getBoundingClientRect();
+    const homeTop = sr.height - cr.height - sr.height * 0.035;
+    cat.classList.add("falling");
+    cat.style.top = homeTop + "px";
+    setTimeout(() => cat.classList.remove("falling"), 500);
+    scheduleIdle();   // 放下后 5 秒无操作进入空闲溜达
+  };
+  cat.addEventListener("pointerup", drop);
+  cat.addEventListener("pointercancel", drop);
+  scheduleIdle();   // 页面加载后同样计时
+
+  // ===== 右键菜单：摸一摸 / 投喂 =====
+  let catMenuEl = null;
+
+  function closeCatMenu() {
+    if (catMenuEl) { catMenuEl.remove(); catMenuEl = null; }
+  }
+  // 小窗固定在猫咪右上方，不遮挡猫
+  function placeCatMenu() {
+    const sr = scene.getBoundingClientRect(), cr = cat.getBoundingClientRect();
+    const mw = catMenuEl.offsetWidth, mh = catMenuEl.offsetHeight;
+    let left = cr.right - sr.left + 8;
+    let top = cr.top - sr.top - mh - 8;
+    if (left + mw > sr.width - 4) left = sr.width - mw - 4;
+    if (top < 4) top = cr.top - sr.top + 2;   // 上方放不下就贴猫头右侧
+    catMenuEl.style.left = left + "px";
+    catMenuEl.style.top = top + "px";
+  }
+  function openCatMenu(view) {
+    closeCatMenu();
+    catMenuEl = document.createElement("div");
+    catMenuEl.className = "cat-menu";
+    catMenuEl.addEventListener("pointerdown", e => e.stopPropagation());
+    catMenuEl.addEventListener("contextmenu", e => e.preventDefault());
+    scene.appendChild(catMenuEl);
+    renderCatMenu(view || "main");
+  }
+  function renderCatMenu(view) {
+    const feed = loadCatFeed();
+    const left = CAT_STOMACH_KCAL - feed.kcal;
+    const pct = Math.min(100, feed.kcal / CAT_STOMACH_KCAL * 100);
+    const barHtml = `
+      <div class="cm-bar"><div class="cm-bar-fill" style="width:${pct}%"></div></div>
+      <div class="cm-bar-label">饱腹 ${feed.kcal} / ${CAT_STOMACH_KCAL} kcal</div>
+    `;
+    if (view === "feed") {
+      const recs = loadHistoryFor(currentUser).filter(r => r.date === todayStr());
+      const items = [];
+      recs.forEach(r => r.items.forEach(i => items.push(i)));
+      let body;
+      if (left <= 0) {
+        body = `<div class="cm-tip">吃饱了，明天再来喂吧 🐱</div>`;
+      } else if (!items.length) {
+        body = `<div class="cm-tip">你今天还没吃东西呢，先去「选餐」记一笔吧～</div>`;
+      } else {
+        const rows = items.map(i => {
+          const isSweet = i.cat === "甜品饮品";
+          const isFed = feed.fed.some(x => x.uid === currentUser && x.name === i.name);
+          const tooBig = i.kcal > left;
+          let btn;
+          if (isSweet) btn = `<button class="cm-feed-item" data-sweet="1"><span>${i.emoji}</span><span>${i.name}</span><span class="fk">${i.kcal}kcal</span></button>`;
+          else if (isFed) btn = `<button class="cm-feed-item" disabled><span>${i.emoji}</span><span>${i.name}</span><span class="fed-tag">已喂过</span></button>`;
+          else if (tooBig) btn = `<button class="cm-feed-item" disabled><span>${i.emoji}</span><span>${i.name}</span><span class="fed-tag">吃不下了</span></button>`;
+          else btn = `<button class="cm-feed-item" data-feed="${i.name}"><span>${i.emoji}</span><span>${i.name}</span><span class="fk">${i.kcal}kcal</span></button>`;
+          return btn;
+        }).join("");
+        body = `<div class="cm-feed-list">${rows}</div>`;
+      }
+      catMenuEl.innerHTML = `
+        <div class="cm-title">🍖 投喂小猫 <button class="cm-close" data-act="close">✕</button></div>
+        ${body}
+        ${barHtml}
+        <button class="cm-btn cm-back" data-act="main">← 返回</button>
+      `;
+    } else {
+      catMenuEl.innerHTML = `
+        <div class="cm-title">🐱 小猫 <button class="cm-close" data-act="close">✕</button></div>
+        <button class="cm-btn" data-act="pet">🤚 摸一摸</button>
+        <button class="cm-btn" data-act="feed">🍖 投喂</button>
+        ${barHtml}
+      `;
+    }
+    placeCatMenu();
+    applyTwemoji(catMenuEl);
+  }
+  // 摸一摸：右上方冒爱心
+  function petCat() {
+    ["", "h2", "h3"].forEach(cls => {
+      const h = document.createElement("span");
+      h.className = "cat-heart" + (cls ? " " + cls : "");
+      h.textContent = cls === "h3" ? "💕" : "❤️";
+      h.addEventListener("animationend", () => h.remove());
+      cat.appendChild(h);
+    });
+    applyTwemoji(cat);
+  }
+  // 投喂
+  function feedCat(name) {
+    const feed = loadCatFeed();
+    const left = CAT_STOMACH_KCAL - feed.kcal;
+    const recs = loadHistoryFor(currentUser).filter(r => r.date === todayStr());
+    const item = recs.flatMap(r => r.items).find(i => i.name === name);
+    if (!item) return;
+    if (item.cat === "甜品饮品") { showToast("哈基米吃了会鼠！🙀"); return; }
+    if (feed.fed.some(x => x.uid === currentUser && x.name === name)) { showToast("这个菜已经喂过啦～"); return; }
+    if (item.kcal > left) { showToast("吃饱了，明天再来喂吧 🐱"); return; }
+    feed.kcal += item.kcal;
+    feed.fed.push({ uid: currentUser, name });
+    saveCatFeed(feed);
+    petCat();
+    showToast(`小猫吃掉了「${name}」，吧唧吧唧… 😋`);
+    renderCatMenu("feed");   // 刷新进度条和按钮状态
+    renderTable();           // 桌上这道菜消失（记录仍在）
+  }
+  document.addEventListener("click", e => {
+    if (catMenuEl) {
+      const act = e.target.closest("[data-act]")?.dataset.act;
+      const feedName = e.target.closest("[data-feed]")?.dataset.feed;
+      const sweet = e.target.closest("[data-sweet]");
+      if (sweet) { showToast("哈基米吃了会鼠！🙀"); return; }
+      if (feedName) { feedCat(feedName); return; }
+      if (act === "close") { closeCatMenu(); return; }
+      if (act === "main") { renderCatMenu("main"); return; }
+      if (act === "feed") { renderCatMenu("feed"); return; }
+      if (act === "pet") { petCat(); return; }
+      if (!catMenuEl.contains(e.target) && !cat.contains(e.target)) closeCatMenu();
+    }
+  });
+  cat.addEventListener("contextmenu", e => {
+    e.preventDefault();
+    if (catMenuEl) closeCatMenu();
+    else openCatMenu("main");
+  });
+})();
+
+// ============ 小饭桌：日式 Omakase 吧台 ============
+function loadHistoryFor(uid) {
+  try { return JSON.parse(localStorage.getItem(`${HISTORY_KEY}__${uid}`)) || []; }
+  catch { return []; }
+}
+let beltRaf = null;
+function stopBelt() {
+  if (beltRaf) { cancelAnimationFrame(beltRaf); beltRaf = null; }
+  stopChefTalk();
+  const bubble = document.getElementById("chefBubble");
+  if (bubble) bubble.classList.remove("show");
+}
+// 座位分配持久化（按座位槽位记录坐的是谁）
+const SEATMAP_KEY = "omakaseSeatMap";
+function loadSeatMap() {
+  try { return JSON.parse(localStorage.getItem(SEATMAP_KEY)) || {}; }
+  catch { return {}; }
+}
+function saveSeatMap(m) {
+  localStorage.setItem(SEATMAP_KEY, JSON.stringify(m));
+}
+// 座位槽位位置（%，相对场景）：板前一字排开，最多 8 个位子
+function seatSlotPos(slot, total) {
+  const margin = 6;                        // 左右边距 %
+  const span = 100 - margin * 2;
+  const x = total === 1 ? 50 : margin + (slot / (total - 1)) * span;
+  return { x, y: `calc(70% - 13px)` };     // 座位贴近吧台下方一排，整体上移 13px
+}
+let seatPick = null;   // 换座：第一个被选中的槽位
+let pilePopEl = null;  // 当前打开的食物堆明细气泡
+
+// 今日菜单牌：统计所有用户今天吃得最多的食物，只推荐一道
+function renderMenuBoard() {
+  const board = document.getElementById("menuBoard");
+  if (!board) return;
+  const today = todayStr();
+  const counts = {};
+  loadUsers().forEach(uid => {
+    loadHistoryFor(uid)
+      .filter(r => r.date === today)
+      .forEach(r => r.items.forEach(i => {
+        if (!counts[i.name]) counts[i.name] = { emoji: i.emoji, qty: 0 };
+        counts[i.name].qty += i.qty || 1;
+      }));
+  });
+  const entries = Object.entries(counts);
+  let lines;
+  if (!entries.length) {
+    lines = ["准备中…"];
+  } else {
+    const [name, v] = entries.reduce((a, b) => (b[1].qty > a[1].qty ? b : a));
+    lines = [`${v.emoji} ${name} ×${v.qty}`];
+  }
+  board.innerHTML = `<div class="bmb-title">本日推荐</div>` +
+    lines.map(l => `<div class="bmb-line">${l}</div>`).join("");
+}
+// ============ 厨师的趣味说话 ============
+const CHEF_IDLE = [
+  "今天也要好好颠勺～",
+  "锅气，最重要的就是锅气！",
+  "板前的位子都给你们留好了",
+  "让我看看今天谁最能吃…",
+  "菜刀已磨好，就等你们点菜了",
+  "嗯～这锅汤的香味，绝了",
+  "炒菜三十年，手稳心不慌",
+  "今天的食材都是早上刚到的！"
+];
+const CHEF_REVIEW_LOW = name => `${name} 吃得真清淡，健康养生啊 🌿`;
+const CHEF_REVIEW_BIG = name => `${name} 这胃口，后生可畏！👏`;
+const CHEF_REVIEW_NODISH = "今天还没人开饭，大厨我先热热锅…";
+let chefTimer = null;
+function stopChefTalk() {
+  if (chefTimer) { clearTimeout(chefTimer); chefTimer = null; }
+}
+function chefSay(text, holdMs = 3000) {
+  const bubble = document.getElementById("chefBubble");
+  if (!bubble) return;
+  bubble.textContent = text;
+  bubble.classList.add("show");
+  stopChefTalk();
+  chefTimer = setTimeout(() => bubble.classList.remove("show"), holdMs);
+}
+function renderTable() {
+  stopBelt();
+  seatPick = null;
+  pilePopEl = null;
+  const scene = document.getElementById("tableScene");
+  scene.querySelectorAll(".seat").forEach(el => el.remove());
+  renderMenuBoard();
+
+  const today = todayStr();
+  const diners = loadUsers()
+    .map(uid => {
+      const recs = loadHistoryFor(uid).filter(r => r.date === today);
+      return recs.length ? { uid, recs, total: recs.reduce((s, r) => s + r.total, 0) } : null;
+    })
+    .filter(Boolean);
+
+  const empty = document.getElementById("tableEmpty");
+  const hint = document.getElementById("seatHint");
+  const list = document.getElementById("dinerList");
+  list.innerHTML = "";
+  document.getElementById("tableStat").textContent =
+    diners.length ? `今天 ${diners.length} 人开饭啦 · 板前 Omakase` : "";
+
+  // 没人吃饭时：提示 + 厨师说话；但椅子照常摆出来
+  empty.style.display = diners.length ? "none" : "block";
+  hint.style.display = diners.length ? "block" : "none";
+  if (!diners.length) chefSay(CHEF_REVIEW_NODISH, 4000);
+
+  // 座位槽位数：没人吃饭时也保留 4 把椅子；有食客时按人数，最多 8 个（多出来的是空位可以换过去）
+  const SLOTS = diners.length
+    ? Math.min(8, Math.max(4, diners.length + (diners.length < 4 ? 1 : 0)))
+    : 4;
+  const seatMap = loadSeatMap();
+  // 给每个食客分配槽位：优先用记住的，否则按顺序填空位
+  const slotOf = new Array(SLOTS).fill(null);
+  const usedSlots = new Set();
+  diners.forEach(d => {
+    const s = seatMap[d.uid];
+    if (s != null && s >= 0 && s < SLOTS && !usedSlots.has(s)) {
+      slotOf[s] = d; usedSlots.add(s);
+    }
+  });
+  let cursor = 0;
+  diners.forEach(d => {
+    if (slotOf.includes(d)) return;
+    while (slotOf[cursor] !== null) cursor++;
+    slotOf[cursor] = d;
+    seatMap[d.uid] = cursor;
+  });
+  saveSeatMap(seatMap);
+
+  const seatEls = [];   // 按槽位存的座位元素（凳子固定不动）
+
+  // 今日称号：热量最低 → 低卡王；菜品最多（同量取热量更高者）→ 大胃王
+  const dishCount = d => d.recs.reduce((s, r) => s + r.items.reduce((a, i) => a + (i.qty || 1), 0), 0);
+  let lowcalUid = null, bigUid = null;
+  if (diners.length >= 2) {
+    lowcalUid = diners.reduce((a, b) => (b.total < a.total ? b : a)).uid;
+    bigUid = diners.reduce((a, b) => {
+      const ca = dishCount(a), cb = dishCount(b);
+      if (cb !== ca) return cb > ca ? b : a;
+      return b.total > a.total ? b : a;   // 份数相同 → 热量更高者为大胃王
+    }).uid;
+    // 同一个人同时最低卡又最多菜：低卡王让位给第二低
+    if (lowcalUid === bigUid) {
+      const sorted = [...diners].sort((a, b) => a.total - b.total);
+      if (sorted.length >= 2) lowcalUid = sorted[1].uid;
+    }
+  }
+
+  // 生成某个槽位上"坐的人"的内容（头像/名字/食物堆/徽章），空位则显示 ＋
+  function fillSeat(seat, d, slot) {
+    seat.classList.toggle("empty-seat", !d);
+    // 清掉旧的食物堆和徽章
+    seat.querySelectorAll(".food-pile, .seat-badge").forEach(el => el.remove());
+    if (d) {
+      const face = seat.querySelector(".face");
+      face.textContent = "";
+      face.style.animationDelay = (slot * 0.25) + "s";
+      paintAvatar(face, d.uid);
+      seat.querySelector(".s-name").textContent = userDisplayName(d.uid);
+      // 米饭标记
+      if (!seat.querySelector(".s-rice")) {
+        const rice = document.createElement("span");
+        rice.className = "s-rice";
+        rice.textContent = "🍚";
+        seat.insertBefore(rice, face);
+      }
+      // 面前桌上的食物堆：emoji 重叠堆积，点击弹出明细（被投喂给小猫的菜从桌上消失）
+      const catFed = loadCatFeed().fed;
+      const dishes = d.recs.flatMap(r => r.items)
+        .filter(i => !catFed.some(x => x.uid === d.uid && x.name === i.name));
+      if (dishes.length) {
+        const pile = document.createElement("div");
+        pile.className = "food-pile";
+        pile.title = "看看吃了什么";
+        const shown = dishes.slice(0, 4);
+        pile.innerHTML = shown.map((x, i) =>
+          `<span class="fp-emoji" style="z-index:${shown.length - i}">${x.emoji}</span>`
+        ).join("") + (dishes.length > 4 ? `<span class="fp-more">+${dishes.length - 4}</span>` : "");
+        pile.onclick = e => {
+          e.stopPropagation();   // 不触发换座
+          if (pilePopEl) { const same = pilePopEl._src === pile; pilePopEl.remove(); pilePopEl = null; if (same) return; }
+          const pop = document.createElement("div");
+          pop.className = "pile-pop";
+          pop._src = pile;
+          pop.innerHTML = d.recs.map(r =>
+            `${r.meal === "lunch" ? "🌞" : "🌙"} ` +
+            r.items.map(x => `${x.emoji}${x.name}${x.qty > 1 ? "×" + x.qty : ""}`).join("、")
+          ).join("<br>") + `<br><b style="color:#ff9a55">${d.total} kcal</b>`;
+          seat.appendChild(pop);
+          pilePopEl = pop;
+        };
+        seat.appendChild(pile);
+      }
+
+      // 称号徽章：座位下方
+      if (d.uid === lowcalUid) {
+        const badge = document.createElement("span");
+        badge.className = "seat-badge badge-lowcal";
+        badge.textContent = "🌿 今日低卡王";
+        seat.appendChild(badge);
+      }
+      if (d.uid === bigUid) {
+        const badge = document.createElement("span");
+        badge.className = "seat-badge badge-big";
+        badge.textContent = "👑 大胃王";
+        seat.appendChild(badge);
+      }
+    } else {
+      const face = seat.querySelector(".face");
+      face.textContent = "＋";
+      face.style.backgroundImage = "none";
+      face.style.backgroundColor = "";
+      face.style.animationDelay = "";
+      seat.querySelector(".s-name").textContent = "空位";
+      const rice = seat.querySelector(".s-rice");
+      if (rice) rice.remove();
+    }
+  }
+
+  // 交换两个槽位上的"人"（凳子/番号牌原地不动，只有用户互换）
+  function swapSlots(a, b) {
+    if (a === b) return;
+    const da = slotOf[a], db = slotOf[b];
+    [slotOf[a], slotOf[b]] = [db, da];
+    if (da) seatMap[da.uid] = b;
+    if (db) seatMap[db.uid] = a;
+    saveSeatMap(seatMap);
+    // 互换内容时带一个小弹跳
+    [seatEls[a], seatEls[b]].forEach((el, i) => {
+      fillSeat(el, slotOf[i === 0 ? a : b], i === 0 ? a : b);
+      const face = el.querySelector(".face");
+      face.classList.remove("yum");
+      void face.offsetWidth;
+      el.classList.add("yum");
+      setTimeout(() => el.classList.remove("yum"), 500);
+    });
+  }
+
+  // 创建全部槽位（凳子固定，人可互换）
+  for (let slot = 0; slot < SLOTS; slot++) {
+    const p = seatSlotPos(slot, SLOTS);
+    const seat = document.createElement("div");
+    seat.className = "seat";
+    seat.dataset.slot = slot;
+    seat.style.left = p.x + "%";
+    seat.style.top = typeof p.y === "number" ? p.y + "%" : p.y;
+    seat.innerHTML = `
+      <div class="face"></div>
+      <div class="stool"></div>
+      <span class="s-name"></span>
+    `;
+    fillSeat(seat, slotOf[slot], slot);
+    // 点击换座：先点一个（高亮），再点另一个（含空位），两座不滑动仅用户互换
+    // 今天还没人吃饭时，空椅子不可换座，只给出提示
+    seat.onclick = () => {
+      if (!diners.length) {
+        showToast("还没有人来吃饭哦 🍽️");
+        return;
+      }
+      if (seatPick === null) {
+        seatPick = seat;
+        seat.querySelector(".face").style.boxShadow = "0 0 0 3px #ff9a55, 0 4px 10px rgba(0,0,0,.12)";
+      } else if (seatPick === seat) {
+        seatPick.querySelector(".face").style.boxShadow = "";
+        seatPick = null;
+      } else {
+        seatPick.querySelector(".face").style.boxShadow = "";
+        const a = parseInt(seatPick.dataset.slot, 10);
+        const b = parseInt(seat.dataset.slot, 10);
+        seatPick = null;
+        swapSlots(a, b);
+        showToast("已换座 💺");
+      }
+    };
+    scene.appendChild(seat);
+    seatEls.push(seat);
+  }
+  // 点别处关闭食物堆明细气泡
+  scene.onclick = () => { if (pilePopEl) { pilePopEl.remove(); pilePopEl = null; } };
+
+  // 厨师自言自语 + 点评：开场打招呼，然后轮播
+  const talkPool = diners.length ? [...CHEF_IDLE] : [CHEF_REVIEW_NODISH, ...CHEF_IDLE];
+  if (lowcalUid) talkPool.push(CHEF_REVIEW_LOW(userDisplayName(lowcalUid)));
+  if (bigUid) talkPool.push(CHEF_REVIEW_BIG(userDisplayName(bigUid)));
+  let talkIdx = Math.floor(Math.random() * talkPool.length);
+  const talkLoop = () => {
+    if (!document.getElementById("viewTable").classList.contains("active")) return;
+    chefSay(talkPool[talkIdx % talkPool.length], 3200);
+    talkIdx++;
+    chefTimer = setTimeout(() => {
+      document.getElementById("chefBubble").classList.remove("show");
+      chefTimer = setTimeout(talkLoop, 2600);
+    }, 3400);
+  };
+  talkLoop();
+
+  // 下方明细（被投喂给小猫的菜也从这里消失，进食记录页仍保留）
+  const catFedForList = loadCatFeed().fed;
+  diners.forEach(d => {
+    const item = document.createElement("div");
+    item.className = "diner-item";
+    const foods = d.recs.map(r =>
+      `${r.meal === "lunch" ? "🌞" : "🌙"} ` +
+      r.items.filter(x => !catFedForList.some(f => f.uid === d.uid && f.name === x.name))
+        .map(x => `${x.emoji}${x.name}${x.qty > 1 ? "×" + x.qty : ""}`).join("、")
+    ).join("<br>");
+    item.innerHTML = `
+      <div class="d-head">
+        <span class="d-name">${userDisplayName(d.uid)}</span>
+        <span class="d-kcal">${d.total} kcal</span>
+      </div>
+      <div class="d-foods">${foods}</div>
+    `;
+    list.appendChild(item);
+  });
+}
+
+// ============ 拒吃（拉黑）名单（按用户隔离） ============
+function loadBlacklist() {
+  try { return JSON.parse(localStorage.getItem(userKey(BLACKLIST_KEY))) || []; }
+  catch { return []; }
+}
+function saveBlacklist(list) {
+  localStorage.setItem(userKey(BLACKLIST_KEY), JSON.stringify(list));
+}
+function isBanned(name) { return loadBlacklist().includes(name); }
+
+// 拒吃：二次确认后拉黑
+function banFood(name) {
+  if (!confirm(`确定要拒吃「${name}」吗？\n\n拉黑后它将不再出现在选餐列表中，可以在「厨余垃圾」里恢复。`)) return;
+  const list = loadBlacklist();
+  if (!list.includes(name)) {
+    list.push(name);
+    saveBlacklist(list);
+  }
+  renderGrid();
+  showToast(`已拒吃「${name}」，扔进了厨余垃圾 🗑️`);
+}
+
+// 恢复单个
+function restoreFood(name) {
+  saveBlacklist(loadBlacklist().filter(n => n !== name));
+  renderBin();
+  renderGrid();
+  showToast(`「${name}」已恢复 ✅`);
+}
+
+// 全部恢复
+function restoreAll() {
+  if (!loadBlacklist().length) return;
+  if (confirm("确定要恢复全部拒吃的食物吗？")) {
+    saveBlacklist([]);
+    renderBin();
+    renderGrid();
+    showToast("已全部恢复 ✅");
+  }
+}
+
+function renderBin() {
+  const names = loadBlacklist();
+  const box = document.getElementById("binList");
+  box.innerHTML = "";
+  document.getElementById("binStat").textContent = names.length ? `共拒吃 ${names.length} 种食物` : "";
+  if (!names.length) {
+    box.innerHTML = '<div class="history-empty">垃圾桶是空的，没有拒吃任何食物～</div>';
+    return;
+  }
+  names.forEach(n => {
+    const f = FOODS.find(x => x.name === n) || { emoji: "🍽️", kcal: "?" };
+    const row = document.createElement("div");
+    row.className = "h-item";
+    row.innerHTML = `
+      <span>${f.emoji}</span>
+      <span class="h-foods" style="flex:none;min-width:0">${n}</span>
+      <span class="h-kcal">${f.kcal} kcal</span>
+      <span style="flex:1"></span>
+      <button class="btn-clear-history" onclick="restoreFood('${n}')">♻️ 恢复</button>
+    `;
+    box.appendChild(row);
+  });
+}
+
+// ============ 状态 ============
+let currentCat = "全部";
+let currentMeal = "lunch";
+let keyword = "";
+let luckyFood = null;
+
+// 餐盘按用户持久化
+function loadPlate() {
+  try {
+    const p = JSON.parse(localStorage.getItem(userKey(PLATE_KEY)));
+    if (p && Array.isArray(p.lunch) && Array.isArray(p.dinner)) return p;
+  } catch {}
+  return { lunch: [], dinner: [] };
+}
+function savePlate() {
+  localStorage.setItem(userKey(PLATE_KEY), JSON.stringify(plate));
+}
+let plate = loadPlate();
+
+// ============ 渲染右侧店铺栏（按菜品种类筛选） ============
+const SHOP_ICONS = {
+  "全部": "🏪 全部美食",
+  "中餐": "🥢 妈妈的家常菜",
+  "湘菜": "🌶️ 老长沙湘菜馆",
+  "主食": "🍚 干饭人主食铺",
+  "快餐": "🍔 快乐肥宅快餐",
+  "麦当劳": "🍟 金拱门",
+  "日韩": "🍱 东京大阪食堂",
+  "轻食": "🥗 吃草轻食社",
+  "汤粉": "🍜 嗦粉喝汤铺子",
+  "火锅烧烤": "🍢 深夜烧烤火锅局",
+  "甜品饮品": "🧋 甜甜奶茶屋"
+};
+const shopList = document.getElementById("shopList");
+CATS.forEach(c => {
+  const cnt = c === "全部" ? FOODS.length : FOODS.filter(f => f.cat === c).length;
+  const btn = document.createElement("button");
+  btn.className = "shop-item" + (c === "全部" ? " active" : "");
+  btn.dataset.cat = c;
+  btn.innerHTML = `<span>${SHOP_ICONS[c] || "🍽️ " + c}</span><span class="cnt">${cnt}道</span>`;
+  btn.onclick = () => {
+    currentCat = c;
+    document.querySelectorAll(".shop-item").forEach(b => b.classList.toggle("active", b.dataset.cat === c));
+    renderGrid();
+  };
+  shopList.appendChild(btn);
+});
+
+// ============ 猜你喜欢 / 常吃 ============
+// 从历史记录统计每种食物的点单次数
+function foodOrderCounts() {
+  const counts = {};
+  loadHistory().forEach(r => r.items.forEach(i => {
+    counts[i.name] = (counts[i.name] || 0) + (i.qty || 1);
+  }));
+  return counts;
+}
+// 常吃：按点单次数排序
+function getOftenFoods(limit) {
+  const counts = foodOrderCounts();
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([name]) => FOODS.find(f => f.name === name))
+    .filter(Boolean);
+}
+// 猜你喜欢：常吃分类里的其他菜 + 热门菜（排除已拉黑）
+function getGuessFoods(limit) {
+  const banned = loadBlacklist();
+  const counts = foodOrderCounts();
+  const oftenNames = Object.keys(counts);
+  const oftenCats = [...new Set(FOODS.filter(f => oftenNames.includes(f.name)).map(f => f.cat))];
+  const pool = FOODS.filter(f => !banned.includes(f.name) && !oftenNames.includes(f.name));
+  // 优先推荐常吃分类中的其他菜
+  const sameCat = pool.filter(f => oftenCats.includes(f.cat));
+  const rest = pool.filter(f => !oftenCats.includes(f.cat));
+  return [...sameCat, ...rest].slice(0, limit);
+}
+function renderQuickStrip(listEl, foods, emptyTip) {
+  const box = document.getElementById(listEl);
+  box.innerHTML = "";
+  if (!foods.length) {
+    box.innerHTML = `<div class="qs-empty">${emptyTip}</div>`;
+    return;
+  }
+  foods.forEach(f => {
+    const chip = document.createElement("button");
+    chip.className = "qs-chip";
+    chip.innerHTML = `<span class="q-emoji">${f.emoji}</span><span>${f.name}</span><span class="q-kcal">${f.kcal}kcal</span><span style="color:#ffab73">＋</span>`;
+    chip.onclick = () => { addToPlate(f); showToast(`已加入餐盘：${f.name}`); };
+    box.appendChild(chip);
+  });
+}
+function renderQuickStrips() {
+  renderQuickStrip("guessList", getGuessFoods(4), "记几餐后就能猜你的口味啦～");
+  renderQuickStrip("oftenList", getOftenFoods(4), "还没有常吃的菜，快去点几单吧～");
+}
+
+// ============ 渲染食物卡片 ============
+function renderGrid() {
+  const grid = document.getElementById("foodGrid");
+  grid.innerHTML = "";
+  const banned = loadBlacklist();
+  const list = FOODS.filter(f =>
+    !banned.includes(f.name) &&
+    (currentCat === "全部" || f.cat === currentCat) &&
+    (!keyword || f.name.includes(keyword))
+  );
+  if (!list.length) {
+    grid.innerHTML = '<p style="grid-column:1/-1;text-align:center;color:#bbb;padding:40px 0">没有找到相关美食，换个关键词试试～</p>';
+    return;
+  }
+  list.forEach(f => {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <button class="btn-ban" title="拒吃这道菜">🚫</button>
+      <div class="emoji">${f.emoji}</div>
+      <div class="name">${f.name}</div>
+      <div class="kcal">🔥 ${f.kcal} kcal</div>
+      <div class="cat-tag">${f.cat}</div>
+      <button class="btn-add">＋ 加入餐盘</button>
+    `;
+    card.querySelector(".btn-add").onclick = () => addToPlate(f);
+    card.querySelector(".btn-ban").onclick = () => banFood(f.name);
+    grid.appendChild(card);
+  });
+}
+
+// ============ 搜索 ============
+document.getElementById("searchInput").addEventListener("input", e => {
+  keyword = e.target.value.trim();
+  renderGrid();
+});
+
+// ============ 餐盘操作 ============
+function addToPlate(f) {
+  const items = plate[currentMeal];
+  const exist = items.find(i => i.name === f.name);
+  if (exist) exist.qty++;
+  else items.push({ ...f, qty: 1 });
+  savePlate();
+  renderPlate();
+}
+function changeQty(name, delta) {
+  const items = plate[currentMeal];
+  const it = items.find(i => i.name === name);
+  if (!it) return;
+  it.qty += delta;
+  if (it.qty <= 0) plate[currentMeal] = items.filter(i => i.name !== name);
+  savePlate();
+  renderPlate();
+}
+function clearPlate() {
+  plate[currentMeal] = [];
+  savePlate();
+  renderPlate();
+}
+function switchMeal(meal) {
+  currentMeal = meal;
+  document.querySelectorAll(".meal-btn").forEach(b =>
+    b.classList.toggle("active", b.dataset.meal === meal));
+  renderPlate();
+}
+function plateTotal(items) {
+  return items.reduce((s, i) => s + i.kcal * i.qty, 0);
+}
+function renderPlate() {
+  const box = document.getElementById("plateItems");
+  const items = plate[currentMeal];
+  box.innerHTML = "";
+  if (!items.length) {
+    box.innerHTML = '<div class="plate-empty">餐盘空空如也 🍽️</div>';
+  } else {
+    items.forEach(i => {
+      const row = document.createElement("div");
+      row.className = "plate-item";
+      row.innerHTML = `
+        <span>${i.emoji}</span>
+        <span class="p-name">${i.name}</span>
+        <button class="qty-btn" onclick="changeQty('${i.name}', -1)">−</button>
+        <span>${i.qty}</span>
+        <button class="qty-btn" onclick="changeQty('${i.name}', 1)">＋</button>
+        <span class="p-kcal">${i.kcal * i.qty} kcal</span>
+      `;
+      box.appendChild(row);
+    });
+  }
+  const total = plateTotal(items);
+  document.getElementById("totalKcal").textContent = total + " kcal";
+
+  const target = MEAL_TARGET[currentMeal];
+  const advice = document.getElementById("advice");
+  const mealName = currentMeal === "lunch" ? "午饭" : "晚饭";
+  if (total === 0) advice.textContent = "还是空的，快去加点好吃的吧～";
+  else if (total < target * 0.6) advice.textContent = `这顿${mealName}才 ${total} kcal，有点少，建议再加个主食或肉类哦（参考：${target} kcal）`;
+  else if (total <= target * 1.2) advice.textContent = `这顿${mealName} ${total} kcal，搭配合理，放心吃吧！✅`;
+  else advice.textContent = `这顿${mealName} ${total} kcal，超过建议量啦（参考：${target} kcal），要不减个菜？😅`;
+}
+
+// ============ 自定义食物：智能查热量 ============
+function toggleCustom() {
+  const body = document.getElementById("customBody");
+  body.classList.toggle("open");
+  document.getElementById("customArrow").textContent = body.classList.contains("open") ? "▴" : "▾";
+}
+function fuzzyLookup(name) {
+  const n = name.replace(/\s+/g, "");
+  if (KCAL_DB[n] != null) return { key: n, kcal: KCAL_DB[n], exact: true };
+  let hit = Object.keys(KCAL_DB).find(k => k.includes(n));
+  if (hit) return { key: hit, kcal: KCAL_DB[hit], exact: false };
+  hit = Object.keys(KCAL_DB).find(k => n.length >= 2 && n.includes(k));
+  if (hit) return { key: hit, kcal: KCAL_DB[hit], exact: false };
+  return null;
+}
+function lookupKcal() {
+  const name = document.getElementById("customName").value.trim();
+  const resultBox = document.getElementById("customResult");
+  const suggest = document.getElementById("customSuggest");
+  const kcalInput = document.getElementById("customKcal");
+  const tip = document.getElementById("customTip");
+  if (!name) { showToast("先输入菜名哦～"); return; }
+
+  resultBox.style.display = "flex";
+  const hit = fuzzyLookup(name);
+  if (hit) {
+    kcalInput.value = hit.kcal;
+    suggest.innerHTML = hit.exact
+      ? `✅ 找到「${hit.key}」，约 <b style="color:#ff9a55">${hit.kcal} kcal/份</b>`
+      : `🔎 未精确匹配，参考「${hit.key}」约 <b style="color:#ff9a55">${hit.kcal} kcal/份</b>，可手动调整`;
+    tip.textContent = "热量为每份估算值（数据参考常见食物热量表），可直接修改。";
+  } else {
+    kcalInput.value = "";
+    suggest.innerHTML = `❓ 数据库里没有「${name}」，请手动输入热量（可参考薄荷健康/百度查询）`;
+    tip.textContent = "提示：一般炒菜 200-400 kcal/份，肉类 300-500 kcal/份，主食 400-600 kcal/份。";
+  }
+  kcalInput.focus();
+}
+function addCustom() {
+  const name = document.getElementById("customName").value.trim();
+  const kcal = parseInt(document.getElementById("customKcal").value, 10);
+  if (!name) { showToast("先输入菜名哦～"); return; }
+  if (isNaN(kcal) || kcal < 0) { showToast("请先查热量或手动填写热量"); return; }
+  addToPlate({ name, emoji: "🍽️", kcal, cat: "自定义" });
+  showToast(`已加入餐盘：${name}`);
+  document.getElementById("customName").value = "";
+  document.getElementById("customKcal").value = "";
+  document.getElementById("customResult").style.display = "none";
+}
+document.getElementById("customName").addEventListener("keydown", e => {
+  if (e.key === "Enter") lookupKcal();
+});
+
+// ============ 历史进食记录（localStorage，按用户隔离） ============
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem(userKey(HISTORY_KEY))) || []; }
+  catch { return []; }
+}
+function saveHistory(list) {
+  localStorage.setItem(userKey(HISTORY_KEY), JSON.stringify(list));
+}
+function todayStr() {
+  const d = new Date();
+  const pad = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+function todayTotalKcal() {
+  return loadHistory().filter(r => r.date === todayStr()).reduce((s, r) => s + r.total, 0);
+}
+function recordMeal() {
+  const items = plate[currentMeal];
+  if (!items.length) { showToast("餐盘是空的，先加点吃的再记录～"); return; }
+  const now = new Date();
+  const pad = n => String(n).padStart(2, "0");
+  const rec = {
+    id: Date.now(),
+    time: `${todayStr()} ${pad(now.getHours())}:${pad(now.getMinutes())}`,
+    date: todayStr(),
+    meal: currentMeal,
+    items: items.map(i => ({ name: i.name, emoji: i.emoji, kcal: i.kcal, qty: i.qty })),
+    total: plateTotal(items)
+  };
+  const list = loadHistory();
+  list.unshift(rec);
+  saveHistory(list);
+  plate[currentMeal] = [];
+  savePlate();
+  renderPlate();
+  showToast("已记录这一餐 ✅");
+}
+function deleteRecord(id) {
+  saveHistory(loadHistory().filter(r => r.id !== id));
+  renderHistory();
+}
+function clearHistory() {
+  if (!loadHistory().length) return;
+  if (confirm("确定要清空全部进食记录吗？")) {
+    saveHistory([]);
+    renderHistory();
+  }
+}
+function renderHistory() {
+  const list = loadHistory();
+  const box = document.getElementById("historyList");
+  box.innerHTML = "";
+
+  const total = todayTotalKcal();
+  document.getElementById("todayStat").textContent =
+    total > 0 ? `今日已摄入：${total} kcal` : "今天还没有记录";
+  renderQuickStrips();  // 常吃数据变了，同步刷新
+
+  if (!list.length) {
+    box.innerHTML = '<div class="history-empty">暂无记录，去「选餐」吃完一餐点「记一笔」就会出现在这里～</div>';
+    return;
+  }
+  list.forEach(r => {
+    const row = document.createElement("div");
+    row.className = "h-item";
+    const foods = r.items.map(i => `${i.emoji}${i.name}${i.qty > 1 ? "×" + i.qty : ""}`).join("、");
+    row.innerHTML = `
+      <span class="h-time">${r.time}</span>
+      <span class="h-meal ${r.meal === "dinner" ? "dinner" : ""}">${r.meal === "lunch" ? "🌞 午饭" : "🌙 晚饭"}</span>
+      <span class="h-foods">${foods}</span>
+      <span class="h-kcal">${r.total} kcal</span>
+      <button class="h-del" title="删除这条记录" onclick="deleteRecord(${r.id})">✕</button>
+      <div class="h-review">💬 ${mealReview(r)}</div>
+    `;
+    box.appendChild(row);
+  });
+}
+function renderHomeStat() {
+  document.getElementById("homeTodayKcal").textContent = todayTotalKcal() + " kcal";
+}
+
+// ============ 进食记录：趣味评价 ============
+const REVIEW_POOL = {
+  light: [  // 吃太少
+    "就吃这么点？胃表示还没开始上班 🥲",
+    "小鸟胃本胃了，下午别喊饿哦～",
+    "这点热量，散步十分钟就消耗完了 🚶",
+    "减肥可以，别委屈了肚子呀",
+    "吃得比猫还少，是给晚饭留肚子吗？🐱"
+  ],
+  good: [   // 吃得刚好
+    "不多不少，营养师看了都点头 ✅",
+    "这顿吃得很有分寸，给你一朵小红花 🌸",
+    "完美热量控制，自律的吃货最可爱！",
+    "荤素搭配合理，是干饭界的模范生 👏",
+    "这顿饭的热量，刚刚好卡在舒适区～"
+  ],
+  heavy: [  // 吃超标
+    "好家伙，这是把明天的饭也预支了？😂",
+    "干饭王就是你！记得多走两圈消消食 🏃",
+    "热量爆表！这顿吃得真豪横 💪",
+    "这热量，健身房教练看了直摇头 🏋️",
+    "吃都吃了，快乐最重要！明天轻食安排一下？"
+  ],
+  spicy: [  // 有湘菜/辣的
+    "又是火辣辣的一顿，长沙魂觉醒 🌶️🔥",
+    "无辣不欢！记得喝点温水护护胃",
+    "辣椒摄入量达标，湖南人表示很欣慰 🌶️"
+  ],
+  sweet: [  // 有甜品饮品
+    "饭后甜点，快乐加倍 🍰 就是热量也加倍了哈哈",
+    "奶茶续命成功，今日快乐水已到账 🧋",
+    "甜食治愈一切，这顿心情值拉满 ✨"
+  ],
+  junk: [   // 有快餐/麦当劳
+    "快乐肥宅餐认证！偶尔放纵一下没关系 🍔",
+    "今日份的快乐是油炸的 🍟",
+    "碳水+脂肪的双重快乐，懂的都懂 😎"
+  ],
+  late: [   // 晚饭吃得晚（21点后）
+    "这么晚才吃？胃要加班了，早点休息 🌙",
+    "深夜食堂开张，吃完记得别马上躺下哦",
+    "夜宵虽香，肠胃想早点下班 😴"
+  ]
+};
+function mealReview(rec) {
+  const pool = [];
+  const names = rec.items.map(i => i.name).join(",");
+  const cats = FOODS.filter(f => rec.items.some(i => i.name === f.name)).map(f => f.cat);
+  const target = MEAL_TARGET[rec.meal] || 700;
+
+  if (cats.includes("湘菜")) pool.push(...REVIEW_POOL.spicy);
+  if (cats.includes("甜品饮品")) pool.push(...REVIEW_POOL.sweet);
+  if (cats.includes("快餐") || cats.includes("麦当劳")) pool.push(...REVIEW_POOL.junk);
+  if (rec.meal === "dinner") {
+    const hour = parseInt((rec.time.split(" ")[1] || "12:00").split(":")[0], 10);
+    if (hour >= 21 || hour < 4) pool.push(...REVIEW_POOL.late);
+  }
+  if (rec.total < target * 0.5) pool.push(...REVIEW_POOL.light);
+  else if (rec.total <= target * 1.15) pool.push(...REVIEW_POOL.good);
+  else pool.push(...REVIEW_POOL.heavy);
+
+  // 按记录 id 固定选一条，保证每次刷新评价不变
+  return pool[rec.id % pool.length];
+}
+
+// ============ BMI / 体脂率 计算器 ============
+let bmiSex = "male";
+function pickSex(sex) {
+  bmiSex = sex;
+  document.querySelectorAll(".sex-btn").forEach(b =>
+    b.classList.toggle("active", b.dataset.sex === sex));
+}
+function calcBmi() {
+  const h = parseFloat(document.getElementById("bmiHeight").value);
+  const w = parseFloat(document.getElementById("bmiWeight").value);
+  const age = parseFloat(document.getElementById("bmiAge").value);
+  if (!h || !w || h < 80 || h > 250 || w < 20 || w > 300) {
+    showToast("请输入合理的身高和体重～"); return;
+  }
+  if (!age || age < 10 || age > 100) {
+    showToast("请输入合理的年龄（用于体脂率估算）～"); return;
+  }
+  const bmi = w / Math.pow(h / 100, 2);
+  const bmiVal = Math.round(bmi * 10) / 10;
+  document.getElementById("bmiNum").textContent = bmiVal;
+
+  let tag, cls, advice;
+  if (bmi < 18.5) {
+    tag = "偏瘦"; cls = "tag-thin";
+    advice = "体重偏轻啦，建议适当增加优质蛋白和主食摄入，每餐可以多吃点肉和米饭，配合适度力量训练增肌。";
+  } else if (bmi < 24) {
+    tag = "正常 ✅"; cls = "tag-normal";
+    advice = "体重很标准，继续保持！注意三餐规律、荤素搭配，偶尔吃点湘菜解馋也没问题～";
+  } else if (bmi < 28) {
+    tag = "超重"; cls = "tag-fat";
+    advice = "稍微有点超标，建议少油少糖，多选轻食和清蒸类，控制奶茶甜品，每天多走走路。";
+  } else {
+    tag = "肥胖"; cls = "tag-obese";
+    advice = "需要注意啦！建议控制总热量摄入，少吃油炸烧烤和含糖饮料，多喝水，逐步增加运动量，必要时咨询医生或营养师。";
+  }
+  const tagEl = document.getElementById("bmiTag");
+  tagEl.textContent = tag;
+  tagEl.className = cls;
+
+  // 指针位置：BMI 14~34 映射到 0%~100%
+  const pos = Math.min(100, Math.max(0, (bmi - 14) / 20 * 100));
+  document.getElementById("bmiPointer").style.left = pos + "%";
+
+  // ===== 体脂率估算（BMI 推算法：1.2×BMI + 0.23×年龄 − 10.8×性别 − 5.4，男=1 女=0） =====
+  const bf = 1.2 * bmi + 0.23 * age - 10.8 * (bmiSex === "male" ? 1 : 0) - 5.4;
+  const bfVal = Math.round(bf * 10) / 10;
+  document.getElementById("bfNum").textContent = bfVal;
+
+  // 成人参考范围（男 / 女）
+  const range = bmiSex === "male"
+    ? { low: 10, norm: 20, high: 25, scale: "偏低 <10%", scale2: "正常 10-20%", scale3: "偏高 20-25%", scale4: "过高 ≥25%" }
+    : { low: 18, norm: 28, high: 33, scale: "偏低 <18%", scale2: "正常 18-28%", scale3: "偏高 28-33%", scale4: "过高 ≥33%" };
+  let bfTag, bfCls, bfAdvice;
+  if (bf < range.low) {
+    bfTag = "偏低"; bfCls = "tag-bf-low";
+    bfAdvice = "体脂率偏低，注意别过度节食，适当补充优质脂肪（坚果、鱼、牛油果）。";
+  } else if (bf < range.norm) {
+    bfTag = "正常 ✅"; bfCls = "tag-bf-normal";
+    bfAdvice = "体脂率在健康区间，线条应该不错，继续保持运动和饮食节奏！";
+  } else if (bf < range.high) {
+    bfTag = "偏高"; bfCls = "tag-bf-high";
+    bfAdvice = "体脂率有点高了，建议每周 3 次有氧 + 控制精制糖和油炸，慢慢降下来。";
+  } else {
+    bfTag = "过高"; bfCls = "tag-bf-vhigh";
+    bfAdvice = "体脂率超标明显，内脏脂肪风险增加，建议从饮食控油控糖做起，循序渐进增加运动。";
+  }
+  const bfTagEl = document.getElementById("bfTag");
+  bfTagEl.textContent = bfTag;
+  bfTagEl.className = bfCls;
+  // 体脂率刻度条：0~40% 映射
+  const bfPos = Math.min(100, Math.max(0, bf / 40 * 100));
+  document.getElementById("bfPointer").style.left = bfPos + "%";
+  document.getElementById("bfScale").innerHTML =
+    `<span>${range.scale}</span><span>${range.scale2}</span><span>${range.scale3}</span><span>${range.scale4}</span>`;
+
+  // 每日热量建议：按标准体重 × 30 kcal 估算
+  const stdWeight = Math.round(22 * Math.pow(h / 100, 2));
+  const dailyKcal = Math.round(stdWeight * 30 / 10) * 10;
+  document.getElementById("bmiAdvice").innerHTML =
+    `<b>健康参考</b><br>· 标准体重约 <b>${stdWeight} kg</b><br>· 每日建议摄入约 <b>${dailyKcal} kcal</b>（午饭约 ${Math.round(dailyKcal * 0.4)} / 晚饭约 ${Math.round(dailyKcal * 0.3)} kcal）<br>· ${advice}<br>· ${bfAdvice}<br><span style="color:#bbb;font-size:12px">※ 体脂率为 BMI 公式估算值，仅供参考，精确测量建议使用体脂秤</span>`;
+
+  document.getElementById("bmiResult").style.display = "block";
+}
+document.getElementById("bmiWeight").addEventListener("keydown", e => {
+  if (e.key === "Enter") calcBmi();
+});
+document.getElementById("bmiAge").addEventListener("keydown", e => {
+  if (e.key === "Enter") calcBmi();
+});
+
+// ============ toast ============
+let toastTimer = null;
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 1800);
+}
+
+// ============ 随机推荐：开餐盖抽卡 ============
+function kcalTier(kcal) {
+  if (kcal < 300)  return { key: "low",  label: "🌿 低卡清爽", glow: "glow-low",  rays: "rays-low" };
+  if (kcal <= 550) return { key: "mid",  label: "✨ 能量适中", glow: "glow-mid",  rays: "rays-mid" };
+  return               { key: "high", label: "🔥 热量炸弹", glow: "glow-high", rays: "rays-high" };
+}
+function luckyDraw() {
+  const banned = loadBlacklist();
+  const pool = FOODS.filter(f => !banned.includes(f.name));
+  if (!pool.length) { showToast("可选的菜都被拒吃啦，先去厨余垃圾恢复一些吧～"); return; }
+  luckyFood = pool[Math.floor(Math.random() * pool.length)];
+
+  const tier = kcalTier(luckyFood.kcal);
+  document.getElementById("mEmoji").textContent = luckyFood.emoji;
+  document.getElementById("mName").textContent = luckyFood.name;
+  document.getElementById("mKcal").textContent = `🔥 ${luckyFood.kcal} kcal · ${luckyFood.cat}`;
+  const tierEl = document.getElementById("mTier");
+  tierEl.textContent = tier.label;
+  tierEl.className = "kcal-tier tier-" + tier.key;
+
+  const glow = document.getElementById("clocheGlow");
+  glow.className = "cloche-glow " + tier.glow;
+  document.getElementById("clocheRays").className = "cloche-rays " + tier.rays;
+
+  // 重置餐盖状态：盖子合拢，等待点击开启
+  const stage = document.getElementById("clocheStage");
+  stage.classList.remove("open");
+  document.getElementById("clocheHint").textContent = "👆 点击盖子，揭晓今日美味";
+  document.getElementById("modalMask").classList.add("show");
+}
+function openCloche() {
+  const stage = document.getElementById("clocheStage");
+  if (stage.classList.contains("open")) return;
+  // 重触发食物升起动画
+  stage.classList.add("open");
+  document.getElementById("clocheHint").textContent = "🎉 揭晓！今天就吃它吧～";
+}
+function addLucky() {
+  if (luckyFood) addToPlate(luckyFood);
+  hideModal();
+}
+function hideModal() {
+  document.getElementById("modalMask").classList.remove("show");
+}
+function closeModal(e) {
+  if (e.target.id === "modalMask") hideModal();
+}
+
+// ============ 随机页：模式选择 + Omakase 套餐 ============
+let omaSet = [];          // 当前搭配好的套餐
+let omaCooking = false;   // 厨师是否正在忙
+let omaBubbleTimer = null;
+let omaCount = 3;         // 套餐道数（1-4，可在 Omakase 舞台下方切换）
+const omaTimers = [];     // 上菜动画的定时器，换模式/离开时统一清理
+
+function clearOmaTimers() {
+  while (omaTimers.length) clearTimeout(omaTimers.pop());
+}
+// 切换套餐道数：只改数字，不动桌上的菜；下次点厨师开工时生效
+function setOmaCount(n, silent) {
+  omaCount = Math.min(4, Math.max(1, n));
+  document.querySelectorAll("#omaCount .on-btn").forEach(b =>
+    b.classList.toggle("active", +b.dataset.n === omaCount));
+  if (!silent && !omaCooking) omaSay(`好的，给您安排 ${omaCount} 道！点我开工～`, 2200);
+}
+
+function gachaBack() {   // 回到模式选择（进入随机页时的默认状态）
+  stopOma();
+  document.getElementById("gachaModes").style.display = "grid";
+  document.getElementById("omaStage").style.display = "none";
+}
+function gachaPick(mode) {
+  if (mode === "card") { luckyDraw(); return; }   // 抽卡：直接弹出餐盖窗口
+  document.getElementById("gachaModes").style.display = "none";
+  document.getElementById("omaStage").style.display = "block";
+  resetOmaStage();
+  setOmaCount(omaCount, true);   // 同步数量按钮的高亮状态
+  omaSay("欢迎光临！点我一下，马上给您安排～", 3600);
+}
+function stopOma() {
+  omaCooking = false;
+  clearOmaTimers();
+  if (omaBubbleTimer) { clearTimeout(omaBubbleTimer); omaBubbleTimer = null; }
+  const chef = document.getElementById("omaChef");
+  if (chef) chef.classList.remove("busy");
+  const sweat = document.getElementById("omaSweat");
+  if (sweat) sweat.style.display = "none";
+}
+function resetOmaStage() {
+  stopOma();
+  omaSet = [];
+  document.getElementById("omaDishes").innerHTML = "";
+  document.getElementById("omaActions").style.display = "none";
+  document.getElementById("omaCountRow").style.marginTop = "";
+}
+function omaSay(text, holdMs = 2600) {
+  const b = document.getElementById("omaBubble");
+  b.textContent = text;
+  b.classList.add("show");
+  if (omaBubbleTimer) clearTimeout(omaBubbleTimer);
+  omaBubbleTimer = setTimeout(() => b.classList.remove("show"), holdMs);
+}
+// 套餐搭配：道数由 omaCount 决定（1-4 道），主食+主菜+素菜/汤+饮品/甜品，热量贴合当餐目标
+// 同一次抽选不许出现重复菜品，饮品/甜品类最多一道
+function buildOmakase(count) {
+  const banned = loadBlacklist();
+  const ok = f => !banned.includes(f.name);
+  const pick = arr => arr && arr.length ? arr[Math.floor(Math.random() * arr.length)] : null;
+  const staples  = FOODS.filter(f => f.cat === "主食" && ok(f));
+  const mains    = FOODS.filter(f => ["中餐", "湘菜", "日韩", "快餐", "麦当劳", "火锅烧烤"].includes(f.cat) && ok(f));
+  const veggies  = FOODS.filter(f => (f.cat === "轻食" || f.cat === "汤粉" || (["中餐", "湘菜"].includes(f.cat) && f.kcal <= 200)) && ok(f));
+  const drinks   = FOODS.filter(f => f.cat === "甜品饮品" && ok(f));
+
+  const set = [];
+  const used = new Set();
+  // 去重：同名或同类（对饮品）不重复加入
+  const add = (f, noDupCat) => {
+    if (!f || used.has(f.name)) return false;
+    if (noDupCat && set.some(x => x.cat === f.cat)) return false;
+    used.add(f.name); set.push(f); return true;
+  };
+
+  count = Math.min(4, Math.max(1, count || omaCount));
+  // 黑名单太狠时某些分类可能为空，互补合并保证总能出菜
+  const stapleMains = staples.length ? staples : mains;
+  const mainDishes  = mains.length ? mains : staples;
+  if (count === 1) {
+    // 只要 1 道：从主食+主菜里随机来一道
+    add(pick(Math.random() < 0.5 ? stapleMains : mainDishes));
+  } else {
+    add(pick(stapleMains));                   // 1 主食
+    add(pick(mainDishes));                    // 1 主菜
+    if (count >= 3) {
+      const total0 = set.reduce((s, f) => s + f.kcal, 0);
+      const target = MEAL_TARGET[currentMeal] || 700;
+      // 目标内还能加就加一份素菜/汤（优先选不把总热量顶超的）
+      if (total0 < target * 0.85 && veggies.length) {
+        const v = veggies.filter(f => total0 + f.kcal <= target * 1.15 && !used.has(f.name));
+        add(pick(v.length ? v : veggies.filter(f => !used.has(f.name))));
+      }
+      // 素菜没加成（热量顶不住），就用饮品/甜品补到 3 道
+      if (set.length < 3) add(pick(drinks), true);
+    }
+    if (count >= 4) {
+      // 第 4 道：优先来一杯饮品/甜品（还没加过的话），否则从主菜/素菜里再挑一道不重名的
+      if (!set.some(x => x.cat === "甜品饮品")) {
+        add(pick(drinks), true);
+      }
+      if (set.length < 4) {
+        const target = MEAL_TARGET[currentMeal] || 700;
+        const extra = [...mains, ...veggies].filter(f => !used.has(f.name) && set.reduce((s, x) => s + x.kcal, 0) + f.kcal <= target * 1.3);
+        add(pick(extra.length ? extra : [...mains, ...veggies].filter(f => !used.has(f.name))));
+      }
+    }
+  }
+  return set.slice(0, count);   // 兜底：无论如何不超过选定道数
+}
+function startOmakase() {
+  if (omaCooking) return;
+  resetOmaStage();
+  omaCooking = true;
+  const chef = document.getElementById("omaChef");
+  const sweat = document.getElementById("omaSweat");
+  chef.classList.add("busy");
+  sweat.style.display = "flex";
+  omaSay(`交给我吧！${omaCount} 道马上好，嘿咻嘿咻…`, 1600);
+
+  omaSet = buildOmakase();
+  const box = document.getElementById("omaDishes");
+  // 1.7 秒忙碌 → 菜依次上桌（每道间隔 0.4s）
+  omaTimers.push(setTimeout(() => {
+    chef.classList.remove("busy");
+    sweat.style.display = "none";
+    omaCooking = false;
+    omaSet.forEach((f, i) => {
+      omaTimers.push(setTimeout(() => {
+        const dish = document.createElement("div");
+        dish.className = "oma-dish";
+        dish.innerHTML = `
+          <span class="od-food">${f.emoji}</span>
+          <span class="od-plate"></span>
+          <span class="od-name">${f.name} <span class="od-kcal">${f.kcal}kcal</span></span>
+        `;
+        box.appendChild(dish);
+        requestAnimationFrame(() => requestAnimationFrame(() => dish.classList.add("served")));
+        applyTwemoji(dish);
+        if (i === omaSet.length - 1) {
+          omaTimers.push(setTimeout(() => {
+            const total = omaSet.reduce((s, x) => s + x.kcal, 0);
+            document.getElementById("omaTotal").innerHTML =
+              `今日 Omakase：${omaSet.length} 道 · 共 <b>${total} kcal</b>`;
+            document.getElementById("omaActions").style.display = "block";
+            document.getElementById("omaCountRow").style.marginTop = "14px";
+            omaSay("请慢用！这样的搭配可还满意？", 3200);
+            applyTwemoji(document.getElementById("omaStage"));
+          }, 450));
+        }
+      }, i * 400));
+    });
+  }, 1700));
+}
+function addOmakase() {
+  omaSet.forEach(f => addToPlate(f));
+  showToast(`已把 ${omaSet.length} 道菜全部加入餐盘 ✅`);
+  gachaBack();
+}
+document.getElementById("omaChef").addEventListener("click", () => {
+  if (omaCooking) return;
+  startOmakase();   // 点厨师：开做 / 重做一套
+});
+
+// 初始化
+renderUserSelect();
+renderAvatar();
+renderGrid();
+renderPlate();
+renderHomeStat();
+renderQuickStrips();
+applyTwemoji();
+</script>
 </body>
 </html>
