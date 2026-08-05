@@ -1396,10 +1396,75 @@
     margin: 0 .05em; display: inline-block;
   }
 
+  /* ===== 手机适配 ===== */
   @media (max-width: 800px) {
-    .container { flex-direction: column; }
-    .plate { width: 100%; position: static; }
-    .shop-rail { width: 100%; position: static; order: -1; }
+    /* 顶栏：更紧凑 */
+    header { padding: 10px 12px; gap: 8px; }
+    header h1 { font-size: 15px; }
+    .back-btn { padding: 5px 10px; font-size: 12px; }
+    .u-avatar { width: 32px; height: 32px; font-size: 14px; }
+    .user-box { padding: 4px 8px 4px 4px; gap: 6px; }
+    .user-box select { max-width: 76px; font-size: 12px; }
+    .account-chip { padding: 3px 10px 3px 3px; font-size: 12px; }
+    .account-chip .ac-avatar { width: 20px; height: 20px; font-size: 10px; }
+
+    /* 背景装饰少而淡，省性能 */
+    .bg-deco span { opacity: .08; }
+    .bg-deco span:nth-child(n+5) { display: none; }
+
+    /* 首页卡片两列紧凑排 */
+    .home-wrap { padding: 16px 12px 32px; }
+    .home-grid { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+    .home-card .hc-emoji { font-size: 30px; }
+    .home-card .hc-title { font-size: 15px; }
+    .home-card .hc-desc { font-size: 11px; }
+    .home-stat { padding: 12px 14px; }
+
+    /* 选餐页：单列流 */
+    .container { flex-direction: column; padding: 10px; }
+    .toolbar { top: 53px; }
+    .shop-rail {
+      width: 100%; position: static; order: -1;
+      flex-direction: row; overflow-x: auto; overflow-y: hidden;
+      max-height: none; gap: 8px; padding-bottom: 4px;
+    }
+    .shop-card { flex-shrink: 0; min-width: 150px; }
+    .plate { width: 100%; position: static; max-height: none; }
+    .plate-items { max-height: 200px; }
+    .grid { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 6px; }
+    .custom-row { flex-wrap: wrap; }
+    .custom-row input { min-width: 0; flex: 1 1 140px; }
+    .custom-result { flex-wrap: wrap; }
+
+    /* 弹窗贴边 */
+    .modal { width: 92vw; max-width: 92vw; padding: 18px 16px; }
+    .modal .m-emoji { font-size: 46px; }
+
+    /* 页内面板 */
+    .page-wrap { padding: 12px 10px 32px; }
+
+    /* 抽卡页舞台按比例缩 */
+    .oma-scene { height: 230px; }
+
+    /* 小饭桌：场景整体等比缩放（720px 设计稿 → 屏幕宽），构图不变 */
+    .table-scene {
+      transform: scale(calc(97vw / 720)); transform-origin: top center;
+      margin-bottom: calc(-470px * (1 - 97vw / 720));  /* 吃掉缩放留下的空白 */
+    }
+
+    /* 同步徽章别挡顶栏 */
+    .sync-badge { top: auto; bottom: 14px; right: 10px; }
+  }
+
+  /* 小饭桌：竖屏手机（横竖比 < 1）提示横屏 */
+  .rotate-tip {
+    display: none; align-items: center; justify-content: center; gap: 8px;
+    background: #fff4ea; border: 1px solid #ffd9b8; color: #c0672a;
+    border-radius: 12px; padding: 9px 14px; margin: 0 0 10px;
+    font-size: 12.5px;
+  }
+  @media (max-width: 800px) and (orientation: portrait) {
+    .rotate-tip { display: flex; }
   }
 </style>
 </head>
@@ -1661,6 +1726,7 @@
         <h2>🍽️ 今日小饭桌</h2>
         <span class="today-stat" id="tableStat"></span>
       </div>
+      <div class="rotate-tip">📱 小饭桌横屏体验更佳，旋转手机试试吧 ↻</div>
       <div class="table-scene" id="tableScene">
         <!-- 餐厅背景：木墙 + 暖帘 + 吊灯 + 菜单牌 -->
         <div class="restaurant-bg">
