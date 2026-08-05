@@ -340,6 +340,10 @@
     position: sticky; top: 132px;
     max-height: calc(100vh - 150px); overflow-y: auto;
   }
+  /* 手机端餐盘抽屉把手 / 悬浮条 / 遮罩：桌面端隐藏 */
+  .plate-grab { display: none; }
+  .plate-fab { display: none; }
+  .plate-mask { display: none; }
   .plate h2 { font-size: 17px; text-align: center; margin-bottom: 4px; color: #333; }
   .plate .meal-switch { display: flex; gap: 6px; justify-content: center; margin: 10px 0; }
   .meal-btn {
@@ -1422,21 +1426,68 @@
     .home-card .hc-desc { font-size: 11px; }
     .home-stat { padding: 12px 14px; }
 
-    /* 选餐页：单列流 */
-    .container { flex-direction: column; padding: 10px; }
+    /* 选餐页：左店铺窄栏 + 右菜品区两栏并排；餐盘变底部抽屉 */
+    .container { display: block; padding: 8px; }
     .toolbar { top: 53px; }
-    .shop-rail {
-      width: 100%; position: static; order: -1;
-      flex-direction: row; overflow-x: auto; overflow-y: hidden;
-      max-height: none; gap: 8px; padding-bottom: 4px;
+    /* 两栏：店铺栏固定窄列，菜品区占满剩余 */
+    .shop-layout {
+      display: grid; grid-template-columns: 96px 1fr; gap: 8px;
+      align-items: start;
     }
-    .shop-card { flex-shrink: 0; min-width: 150px; }
-    .plate { width: 100%; position: static; max-height: none; }
-    .plate-items { max-height: 200px; }
-    .grid { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 6px; }
+    .shop-rail {
+      width: auto; position: sticky; top: 110px; order: -1;
+      flex-direction: column; overflow-y: auto; overflow-x: hidden;
+      max-height: calc(100vh - 130px); gap: 0; padding-bottom: 0;
+      background: #fff; border: 1px solid #f0f0f0; border-radius: 12px;
+    }
+    .shop-card { min-width: 0; border: none; border-radius: 0; }
+    .shop-card-title { display: none; }   /* 窄栏放不下标题，店铺项自明 */
+    .shop-item {
+      padding: 12px 8px; font-size: 12px; text-align: center;
+      flex-direction: column; gap: 2px; align-items: center;
+      border-left: 3px solid transparent;
+    }
+    .shop-item .cnt { font-size: 10px; }
+    /* 菜品网格收窄，配合店铺栏 */
+    .grid { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; }
+    .card .emoji { font-size: 20px; }
+    .card .btn-add { font-size: 11px; padding: 3px 0; }
     .custom-row { flex-wrap: wrap; }
-    .custom-row input { min-width: 0; flex: 1 1 140px; }
+    .custom-row input { min-width: 0; flex: 1 1 120px; }
     .custom-result { flex-wrap: wrap; }
+
+    /* 餐盘：底部抽屉（默认隐藏，点悬浮条上拉） */
+    .plate {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
+      width: 100%; max-height: 72vh; border-radius: 18px 18px 0 0;
+      border: none; border-top: 1px solid #f0f0f0;
+      box-shadow: 0 -8px 30px rgba(0,0,0,.14);
+      transform: translateY(100%); transition: transform .28s ease;
+      padding: 4px 16px 20px;
+    }
+    .plate.drawer-open { transform: translateY(0); }
+    .plate-grab {
+      display: flex; justify-content: center; padding: 8px 0 4px; cursor: pointer;
+    }
+    .plate-grab .pg-bar { width: 44px; height: 4px; border-radius: 2px; background: #e5e5e5; }
+    /* 抽屉打开时的遮罩 */
+    .plate-mask {
+      position: fixed; inset: 0; z-index: 55; background: rgba(0,0,0,.35);
+      display: block; opacity: 0; pointer-events: none; transition: opacity .28s;
+    }
+    .plate-mask.show { opacity: 1; pointer-events: auto; }
+    /* 底部悬浮条：餐盘入口 */
+    .plate-fab {
+      display: flex; align-items: center; gap: 8px;
+      position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 50;
+      background: #333; color: #fff; border-radius: 26px;
+      padding: 12px 18px; font-size: 13px; cursor: pointer;
+      box-shadow: 0 6px 20px rgba(0,0,0,.25);
+    }
+    .plate-fab .pf-mid { flex: 1; text-align: center; color: #ffcfad; }
+    .plate-fab .pf-arrow { font-size: 10px; color: #999; }
+    /* 悬浮条占位：防止底部内容被挡 */
+    #viewFood .container { padding-bottom: 72px; }
 
     /* 弹窗贴边 */
     .modal { width: 92vw; max-width: 92vw; padding: 18px 16px; }
@@ -1707,7 +1758,10 @@
       </div>
     </div>
 
-    <div class="plate">
+    <div class="plate" id="platePanel">
+      <div class="plate-grab" id="plateGrab" onclick="togglePlateDrawer()">
+        <span class="pg-bar"></span>
+      </div>
       <h2>🍽️ 我的餐盘</h2>
       <div class="meal-switch">
         <button class="meal-btn active" data-meal="lunch" onclick="switchMeal('lunch')">🌞 午饭</button>
@@ -1735,6 +1789,14 @@
       </div>
     </div>
   </div>
+
+  <!-- 手机端：餐盘悬浮条 + 遮罩（桌面端不显示） -->
+  <div class="plate-fab" id="plateFab" onclick="togglePlateDrawer(true)">
+    <span class="pf-left">🍽️ 餐盘</span>
+    <span class="pf-mid" id="plateFabInfo">空空如也</span>
+    <span class="pf-arrow">▲</span>
+  </div>
+  <div class="plate-mask" id="plateMask" onclick="togglePlateDrawer(false)"></div>
 </div>
 
 <!-- ================= 进食记录页 ================= -->
@@ -2688,6 +2750,7 @@ const VIEW_TITLES = { home: "🍚 今天吃什么", food: "🍽️ 选餐", hist
 function goView(name) {
   stopBelt();
   stopOma();
+  togglePlateDrawer(false);   // 离开选餐页时收起餐盘抽屉
   document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
   document.getElementById("view" + name[0].toUpperCase() + name.slice(1)).classList.add("active");
   document.getElementById("pageTitle").textContent = VIEW_TITLES[name];
@@ -3520,6 +3583,21 @@ function switchMeal(meal) {
 function plateTotal(items) {
   return items.reduce((s, i) => s + i.kcal * i.qty, 0);
 }
+// 手机端餐盘抽屉：开关 + 悬浮条信息同步
+function togglePlateDrawer(force) {
+  const p = document.getElementById("platePanel");
+  const mask = document.getElementById("plateMask");
+  const open = force !== undefined ? force : !p.classList.contains("drawer-open");
+  p.classList.toggle("drawer-open", open);
+  mask.classList.toggle("show", open);
+}
+function renderPlateFab() {
+  const info = document.getElementById("plateFabInfo");
+  if (!info) return;
+  const items = plate[currentMeal];
+  const n = items.reduce((s, i) => s + i.qty, 0);
+  info.textContent = n ? `${n} 道菜 · ${plateTotal(items)} kcal` : "空空如也";
+}
 function renderPlate() {
   const box = document.getElementById("plateItems");
   const items = plate[currentMeal];
@@ -3551,6 +3629,7 @@ function renderPlate() {
   else if (total < target * 0.6) advice.textContent = `这顿${mealName}才 ${total} kcal，有点少，建议再加个主食或肉类哦（参考：${target} kcal）`;
   else if (total <= target * 1.2) advice.textContent = `这顿${mealName} ${total} kcal，搭配合理，放心吃吧！✅`;
   else advice.textContent = `这顿${mealName} ${total} kcal，超过建议量啦（参考：${target} kcal），要不减个菜？😅`;
+  renderPlateFab();
 }
 
 // ============ 自定义食物：智能查热量 ============
