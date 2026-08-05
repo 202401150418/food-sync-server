@@ -874,6 +874,8 @@
     width: 72px; z-index: 5; cursor: grab;
     filter: drop-shadow(0 3px 4px rgba(90, 60, 20, .18));
     touch-action: none;
+    -webkit-user-select: none; user-select: none;
+    -webkit-touch-callout: none;   /* iOS 长按不弹系统菜单 */
   }
   .bg-cat.dragging { cursor: grabbing; z-index: 8; }
   .bg-cat.dragging img { animation: none; scale: 1.06; }
@@ -1454,6 +1456,10 @@
 
     /* 同步徽章别挡顶栏 */
     .sync-badge { top: auto; bottom: 14px; right: 10px; }
+
+    /* 猫咪菜单触屏放大（注意：菜单在小饭桌场景内，随场景一起缩放，
+       所以这里按场景缩放比的倒数放大，让实际显示尺寸接近桌面） */
+    .table-scene .cat-menu { zoom: 1.35; }
   }
 
   /* 小饭桌：竖屏手机（横竖比 < 1）提示横屏 */
@@ -2722,9 +2728,25 @@ function saveCatFeed(s) { localStorage.setItem(CAT_FEED_KEY, JSON.stringify(s));
     baseLeft = parseFloat(cat.style.left); baseTop = parseFloat(cat.style.top);
     cat.classList.remove("falling");
     cat.classList.add("dragging");
+    // 手机端长按 = 右键：按住不动 500ms 开菜单；移动超阈值则视为拖拽，取消长按
+    if (e.pointerType !== "mouse") {
+      clearTimeout(longPressTimer);
+      longPressTimer = setTimeout(() => {
+        longPressFired = true;
+        cat.classList.remove("dragging");   // 不进入拖拽
+        if (navigator.vibrate) navigator.vibrate(30);
+        if (catMenuEl) closeCatMenu();
+        else openCatMenu("main");
+        scheduleIdle();
+      }, 500);
+    }
   });
   cat.addEventListener("pointermove", e => {
     if (!cat.classList.contains("dragging")) return;
+    // 移动超过 10px：取消长按计时，按拖拽处理
+    if (Math.abs(e.clientX - startX) > 10 || Math.abs(e.clientY - startY) > 10) {
+      clearTimeout(longPressTimer);
+    }
     const sr = scene.getBoundingClientRect(), cr = cat.getBoundingClientRect();
     let nl = baseLeft + e.clientX - startX;
     let nt = baseTop + e.clientY - startY;
@@ -2734,6 +2756,8 @@ function saveCatFeed(s) { localStorage.setItem(CAT_FEED_KEY, JSON.stringify(s));
     cat.style.top = nt + "px";
   });
   const drop = () => {
+    clearTimeout(longPressTimer);
+    if (longPressFired) { longPressFired = false; return; }   // 长按已触发，不走下落逻辑
     if (!cat.classList.contains("dragging")) return;
     cat.classList.remove("dragging");
     // 下落回到原始高度（bottom 3.5%），左右位置保留
@@ -2750,6 +2774,7 @@ function saveCatFeed(s) { localStorage.setItem(CAT_FEED_KEY, JSON.stringify(s));
 
   // ===== 右键菜单：摸一摸 / 投喂 =====
   let catMenuEl = null;
+  let longPressTimer = null, longPressFired = false;   // 手机端长按 = 右键
 
   function closeCatMenu() {
     if (catMenuEl) { catMenuEl.remove(); catMenuEl = null; }
