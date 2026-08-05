@@ -3040,13 +3040,32 @@ function stopBelt() {
   if (bubble) bubble.classList.remove("show");
 }
 // 座位分配持久化（按座位槽位记录坐的是谁）
+// 按饭桌隔离：游客/单人一个空间，每个房间各一个空间，换座位互不干扰
 const SEATMAP_KEY = "omakaseSeatMap";
+function seatMapScope() {
+  if (Auth.loggedIn && Cloud.rooms.length && tableRoomId) return "room" + tableRoomId;
+  if (Auth.loggedIn && Auth.user) return "me" + Auth.user.id;
+  return "guest";
+}
 function loadSeatMap() {
-  try { return JSON.parse(localStorage.getItem(SEATMAP_KEY)) || {}; }
-  catch { return {}; }
+  try {
+    const all = JSON.parse(localStorage.getItem(SEATMAP_KEY)) || {};
+    // 旧格式兼容：顶层直接是 {uid: slot} 的当作 guest
+    if (Object.values(all).some(v => typeof v === "object" && v !== null)) {
+      return all[seatMapScope()] || {};
+    }
+    return seatMapScope() === "guest" ? all : {};
+  } catch { return {}; }
 }
 function saveSeatMap(m) {
-  localStorage.setItem(SEATMAP_KEY, JSON.stringify(m));
+  let all = {};
+  try { all = JSON.parse(localStorage.getItem(SEATMAP_KEY)) || {}; } catch {}
+  // 旧格式升级：把顶层 {uid: slot} 收进 guest
+  if (!Object.values(all).some(v => typeof v === "object" && v !== null)) {
+    all = { guest: all };
+  }
+  all[seatMapScope()] = m;
+  localStorage.setItem(SEATMAP_KEY, JSON.stringify(all));
 }
 // 座位槽位位置（%，相对场景）：板前一字排开，最多 8 个位子
 function seatSlotPos(slot, total) {
@@ -3117,10 +3136,9 @@ function renderTableRoomBar() {
   const bar = document.getElementById("tableRoomBar");
   if (!bar) return;
   if (!(Auth.loggedIn && Cloud.rooms.length)) { bar.classList.remove("show"); bar.innerHTML = ""; return; }
-  // 默认选中：菜单来源房间，否则第一个房间
+  // 默认选中第一个房间（选餐页菜单切换已移除，不再跟随菜单来源）
   if (!tableRoomId || !Cloud.rooms.some(r => r.id === tableRoomId)) {
-    tableRoomId = (Cloud.menuSource !== "mine" && Cloud.rooms.some(r => String(r.id) === String(Cloud.menuSource)))
-      ? Number(Cloud.menuSource) : Cloud.rooms[0].id;
+    tableRoomId = Cloud.rooms[0].id;
   }
   bar.classList.add("show");
   bar.innerHTML = "";
@@ -4239,7 +4257,7 @@ const Cloud = {
   roomDishes: {},      // roomId -> 房间自定义菜
   history: null,
   blacklist: null,
-  menuSource: "mine",  // "mine" 或房间 id
+  menuSource: "mine",  // 已废弃（选餐页不再切换菜单来源），保留占位避免旧代码引用报错
   memberProfiles: {},  // "cloud:<id>" -> 房间成员资料（小饭桌用）
 };
 
@@ -4297,8 +4315,9 @@ saveProfile = function (uid, p) {
 // ---- 菜单合并与切换 ----
 function activeCustomDishes() {
   if (!Auth.loggedIn) return [];
-  if (Cloud.menuSource === "mine") return Cloud.personal;
-  return Cloud.roomDishes[Cloud.menuSource] || [];
+  // 菜单 = 系统菜 + 我的自定义 + 所有房间自定义（合并展示，不再按来源切换）
+  const roomAll = Object.values(Cloud.roomDishes).flat();
+  return Cloud.personal.concat(roomAll);
 }
 function applyMenu() {
   if (Auth.loggedIn && Cloud.system) {
@@ -4310,12 +4329,6 @@ function applyMenu() {
   renderGrid();
   renderQuickStrips();
   applyTwemoji();
-}
-function switchMenuSource(src) {
-  Cloud.menuSource = src;
-  localStorage.setItem("mealMenuSource", String(src));
-  renderMenuSourceBar();
-  applyMenu();
 }
 
 // ---- 启动：游客 UI 已渲染，这里异步拉云端 ----
@@ -4339,8 +4352,6 @@ async function bootCloud() {
     Cloud.roomDishes = st.roomDishes;
     Cloud.history = st.history;
     Cloud.blacklist = st.blacklist;
-    const saved = localStorage.getItem("mealMenuSource");
-    Cloud.menuSource = (saved && (saved === "mine" || Cloud.roomDishes[saved])) ? saved : "mine";
     applyMenu();
     renderAvatar();
     renderHomeStat();
@@ -4476,26 +4487,11 @@ function logoutCloud() {
 
 // ---- 菜单来源切换条 ----
 function renderMenuSourceBar() {
+  // 选餐页菜单来源切换条已移除；这里仅控制「存入菜单」按钮可见性
   const bar = document.getElementById("menuSourceBar");
+  if (bar) { bar.classList.remove("show"); bar.innerHTML = ""; }
   const saveBtn = document.getElementById("saveToMenuBtn");
-  if (!Auth.loggedIn || !Auth.user) {
-    bar.classList.remove("show");
-    bar.innerHTML = "";
-    if (saveBtn) saveBtn.style.display = "none";
-    return;
-  }
-  bar.classList.add("show");
-  bar.innerHTML = "";
-  const mk = (src, label) => {
-    const b = document.createElement("button");
-    b.className = "ms-btn" + (String(Cloud.menuSource) === String(src) ? " active" : "");
-    b.textContent = label;
-    b.onclick = () => switchMenuSource(src);
-    bar.appendChild(b);
-  };
-  mk("mine", "🍱 我的菜单");
-  Cloud.rooms.forEach(r => mk(r.id, "🏠 " + r.name));
-  if (saveBtn) saveBtn.style.display = "";
+  if (saveBtn) saveBtn.style.display = (Auth.loggedIn && Auth.user) ? "" : "none";
 }
 
 // ---- 自定义菜：存入云端菜单 / 编辑 / 删除 ----
@@ -4504,16 +4500,26 @@ async function saveCustomToMenu() {
   const kcal = parseInt(document.getElementById("customKcal").value, 10);
   if (!name) { showToast("先输入菜名哦"); return; }
   if (!Number.isInteger(kcal) || kcal < 0) { showToast("先查一下或填一下热量"); return; }
-  const scope = Cloud.menuSource === "mine" ? "user" : "room";
+  // 存到哪：我的菜单，或任一房间（弹选择）
+  let scope = "user", roomId;
+  if (Cloud.rooms.length) {
+    const opts = ["我的菜单", ...Cloud.rooms.map(r => r.name)];
+    const pick = prompt(`存到哪里？\n\n${opts.map((o, i) => `${i} - ${o}`).join("\n")}\n\n输入序号：`, "0");
+    if (pick === null) return;
+    const idx = parseInt(pick, 10);
+    if (!Number.isInteger(idx) || idx < 0 || idx >= opts.length) { showToast("序号不对，已取消"); return; }
+    if (idx > 0) { scope = "room"; roomId = Cloud.rooms[idx - 1].id; }
+  }
   try {
     const { dish } = await api("/dishes", {
       method: "POST",
-      body: { scope, roomId: scope === "room" ? Cloud.menuSource : undefined, name, kcal }
+      body: { scope, roomId, name, kcal }
     });
     if (scope === "user") Cloud.personal.push(dish);
-    else (Cloud.roomDishes[Cloud.menuSource] = Cloud.roomDishes[Cloud.menuSource] || []).push(dish);
+    else (Cloud.roomDishes[roomId] = Cloud.roomDishes[roomId] || []).push(dish);
     applyMenu();
-    showToast(`「${name}」已存入${scope === "user" ? "我的" : "房间"}菜单 ☁️`);
+    const target = scope === "user" ? "我的菜单" : Cloud.rooms.find(r => r.id === roomId)?.name || "房间";
+    showToast(`「${name}」已存入${target} ☁️`);
   } catch (e) {
     showToast(e.message);
   }
@@ -4522,7 +4528,13 @@ async function saveCustomToMenu() {
 async function editCustomDish(f) {
   const action = prompt(`编辑「${f.name}」\n\n输入新热量数字 = 改热量\n输入"删"= 从菜单删除\n其他 = 取消`, f.kcal);
   if (action === null) return;
-  const scope = Cloud.menuSource === "mine" ? "user" : "room";
+  // 找到这道菜在哪个 scope（按 id 找）
+  let scope = "user", list = Cloud.personal;
+  if (!list.some(d => d.id === f.id)) {
+    for (const rid of Object.keys(Cloud.roomDishes)) {
+      if (Cloud.roomDishes[rid].some(d => d.id === f.id)) { scope = "room"; list = Cloud.roomDishes[rid]; break; }
+    }
+  }
   try {
     if (action.trim() === "删") {
       if (!confirm(`确定把「${f.name}」从菜单里删掉吗？`)) return;
@@ -4533,7 +4545,6 @@ async function editCustomDish(f) {
       const kcal = parseInt(action, 10);
       if (!Number.isInteger(kcal) || kcal < 0) { showToast("输入无效，已取消"); return; }
       const { dish } = await api("/dishes/" + f.id, { method: "PUT", body: { kcal } });
-      const list = scope === "user" ? Cloud.personal : Cloud.roomDishes[Cloud.menuSource];
       const idx = list.findIndex(d => d.id === f.id);
       if (idx >= 0) list[idx] = dish;
       showToast(`「${f.name}」热量已改为 ${kcal} kcal`);
@@ -4670,7 +4681,7 @@ async function leaveRoom(r) {
     await api(`/rooms/${r.id}/leave`, { method: "POST" });
     Cloud.rooms = Cloud.rooms.filter(x => x.id !== r.id);
     delete Cloud.roomDishes[r.id];
-    if (String(Cloud.menuSource) === String(r.id)) Cloud.menuSource = "mine";
+    if (tableRoomId === r.id) tableRoomId = null;
     renderRoomList();
     renderMenuSourceBar();
     applyMenu();
